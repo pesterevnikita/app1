@@ -12,6 +12,12 @@ data class ProtectionSettings(val settingsMode: Int = 0, val networkExceptions: 
 data class AppState(val policy: PolicySnapshot = PolicySnapshot(), val ledger: LedgerState = LedgerState(), val session: LockedSession? = null, val password: PasswordHash? = null, val failures: Int = 0, val retryAfterUtcMillis: Long = 0, val settings: ProtectionSettings = ProtectionSettings(), val diagnostics: Boolean = false, val countdown: Boolean = false, val popup: Boolean = true)
 object StateGuard {
     fun canUpdateSettings(state: AppState, settings: ProtectionSettings): Boolean = state.session==null || state.settings==settings
+    /** Compare the editor's baseline inside the durable transaction, preventing concurrent partial edits from being lost. */
+    fun settingsChange(state: AppState, settings: ProtectionSettings, expectedSettings: ProtectionSettings? = null): AppState {
+        require(expectedSettings==null || state.settings==expectedSettings) { "Protections changed. Read the current settings and retry." }
+        require(canUpdateSettings(state,settings)) { "Release Restricted Mode to change protections." }
+        return state.copy(settings=settings)
+    }
     /** Central guard used regardless of which UI action originated a policy edit. */
     fun policyChange(state: AppState, proposed: PolicySnapshot, expectedRevision: Long): AppState {
         require(state.policy.revision==expectedRevision) { "Configuration changed. Reopen the editor." }

@@ -55,7 +55,8 @@ class AppStore(private val context: Context, name: String = "focusgate.db") {
     suspend fun updatePolicy(policy: PolicySnapshot, expectedRevision: Long): String? = transact{StateGuard.policyChange(it,policy,expectedRevision)}
     /** Reject usage computed against rules that changed while the service was processing an observation. */
     suspend fun saveLedger(ledger: LedgerState, revision: Long): String? = transact { require(it.policy.revision==revision) { "Stale usage observation" }; it.copy(ledger=ledger) }
-    suspend fun updateSettings(settings: ProtectionSettings): String? = transact { require(StateGuard.canUpdateSettings(it,settings)) { "Release Restricted Mode to change protections." }; it.copy(settings=settings) }
+    /** Optional baseline prevents maintenance requests planned concurrently from replacing one another's protection edits. */
+    suspend fun updateSettings(settings: ProtectionSettings, expectedSettings: ProtectionSettings? = null): String? = transact { StateGuard.settingsChange(it,settings,expectedSettings) }
     /** Store only a salted verifier; consume and clear the caller's character buffer even on failure. */
     suspend fun setPassword(password: CharArray): String? = try { transact { require(it.session==null) { "Password is locked." }; it.copy(password=PasswordVerifier.create(password),failures=0,retryAfterUtcMillis=0) } } finally { password.fill('\u0000') }
     suspend fun preferences(diagnostics: Boolean, countdown: Boolean, popup: Boolean): String? = transact{it.copy(diagnostics=diagnostics,countdown=countdown,popup=popup)}

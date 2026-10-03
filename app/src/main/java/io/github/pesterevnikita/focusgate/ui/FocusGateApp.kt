@@ -25,6 +25,7 @@ import io.github.pesterevnikita.focusgate.diagnostics.LocalDiagnostics
 import io.github.pesterevnikita.focusgate.policy.*
 import io.github.pesterevnikita.focusgate.policy.Target
 import io.github.pesterevnikita.focusgate.runtime.AndroidClock
+import io.github.pesterevnikita.focusgate.runtime.QuotaPresentation
 import io.github.pesterevnikita.focusgate.health.SetupScreens
 import kotlinx.coroutines.*
 import java.time.*
@@ -39,7 +40,6 @@ private fun minutes(ms: Long)=String.format(java.util.Locale.getDefault(),"%d:%0
     val state by store.state.collectAsState()
     val ready by store.ready.collectAsState()
     val connected by ServiceStatus.connected.collectAsState()
-    val remaining by ServiceStatus.remaining.collectAsState()
     var tab by remember {mutableIntStateOf(0)}
     var editor by remember {mutableStateOf<Blocker?>(null)}
     var showEditor by remember{mutableStateOf(false)}
@@ -47,6 +47,12 @@ private fun minutes(ms: Long)=String.format(java.util.Locale.getDefault(),"%d:%0
     var disclosure by remember{mutableStateOf(false)}
     var importText by remember{mutableStateOf<String?>(null)}
     var now by remember{mutableLongStateOf(System.currentTimeMillis())}
+    // Read the existing ticker on every tab. The exempt configuration screen
+    // needs its own countdown tick instead of waiting for Accessibility events.
+    val displayClock=remember(now,state.session?.zoneId) { AndroidClock(context).now(state.session?.zoneId ?: ZoneId.systemDefault().id) }
+    val quotaDisplay=remember(state.policy.groups,state.ledger,displayClock) {
+        state.policy.groups.associate { it.id to QuotaPresentation.project(it,state.ledger,displayClock) }
+    }
     val scope=rememberCoroutineScope()
     fun action(operation: suspend()->String?) {scope.launch{notice=withContext(Dispatchers.IO){runCatching{operation()}.getOrElse{it.message ?: "Action failed"}} ?: "Saved."}}
     val notificationPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){}
@@ -85,15 +91,15 @@ private fun minutes(ms: Long)=String.format(java.util.Locale.getDefault(),"%d:%0
                         items(state.policy.blockers,key={it.id}) { rule ->
                             Card(Modifier.fillMaxWidth()) {Column(Modifier.padding(14.dp)) {
                                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {Text(rule.name,style=MaterialTheme.typography.titleMedium,modifier=Modifier.weight(1f)); Switch(checked=rule.enabled,enabled=state.session==null,onCheckedChange={enabled->action{store.updatePolicy(state.policy.copy(blockers=state.policy.blockers.map{if(it.id==rule.id) it.copy(enabled=enabled) else it}),state.policy.revision)}})}
-                                val clock=AndroidClock(context).now(state.session?.zoneId ?: ZoneId.systemDefault().id)
+                                val clock=displayClock
                                 val active=rule.enabled && ScheduleEvaluator.isActive(rule.schedule,clock.instant,ZoneId.of(clock.zoneId))
-                                Text(when { !rule.enabled->"Disabled"; !active->"Schedule inactive"; rule.quotaGroupId==null->"Blocks while schedule is active"; else->"Shared time left: ${minutes(remaining[rule.quotaGroupId] ?: ((state.policy.groups.find{it.id==rule.quotaGroupId}?.allowanceMillis ?: 0)-(state.ledger.consumed[rule.quotaGroupId] ?: 0)))}"})
+                                Text(when { !rule.enabled->"Disabled"; !active->"Schedule inactive"; rule.quotaGroupId==null->"Blocks while schedule is active"; else->"Shared time left: ${minutes(quotaDisplay[rule.quotaGroupId]?.remainingMillis ?: 0)}"})
                                 rule.quotaGroupId?.let {id->state.policy.groups.find{it.id==id}?.let { group ->
                                     Text("${group.allowanceMillis/60000} min per clock ${group.period.name.lowercase()} · resets ${BucketClock.next(group.period,clock).atZone(ZoneId.of(clock.zoneId)).toLocalTime()}")
                                     group.continuousCapMillis?.let{cap->
                                         Text("Continuous cap ${cap/60000} min; break ${group.requiredBreakMillis/60000} min")
-                                        val session=state.ledger.sessions[id]
-                                        if(session!=null && session.usedMillis>=cap) Text("Break left: ${minutes(session.breakRemaining(group.requiredBreakMillis,clock))}")
+                                        val breakLeft=quotaDisplay[id]?.breakRemainingMillis ?: 0
+                                        if(breakLeft>0) Text("Break left: ${minutes(breakLeft)}")
                                     }
                                 }}
                                 Text(rule.targets.joinToString(", "){it.value},style=MaterialTheme.typography.bodySmall)

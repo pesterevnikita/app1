@@ -59,7 +59,7 @@ $env:JAVA_HOME = '<JDK_21>'
 
 If a development proxy is required, configure it locally. Do not publish its address or credentials.
 
-The latest full verification passed 39 unit tests, lint with zero errors/five warnings, and assembled both debug APKs. One Room instrumentation test also passed on the Xiaomi. Reports are in `policy/build/test-results/test/`, `app/build/test-results/testDebugUnitTest/`, and `app/build/reports/`.
+The latest full verification passed 57 unit tests, lint with zero errors/five warnings, and assembled both debug APKs. One Room instrumentation test also passed on the Xiaomi. Reports are in `policy/build/test-results/test/`, `app/build/test-results/testDebugUnitTest/`, and `app/build/reports/`.
 
 ## Device workflow
 
@@ -84,10 +84,16 @@ Room instrumentation tests use separate database names. To avoid a Gradle device
 adb shell am instrument -w io.github.pesterevnikita.focusgate.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
-Run the Room fixture with Restricted Mode off: its separate database still shares the boot-session preference mirror. Keep tests narrowly scoped and understand their state changes before running. Instrumentation force-stops the target process; on this phone it left Accessibility malfunctioning until a manual off/on toggle. Do not use stock adb shell uiautomator dump for service-resilience assertions: it suppresses Accessibility by default. Prefer input/dumpsys and app-only screenshots, or UiAutomation configured with FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES. Coordinate UI taps with the user and verify the foreground screen; shared device interaction can invalidate old coordinates. Browser coverage, quotas/caps, process/reboot recovery, Settings/Recents classification, Device Admin, password timing and battery cost still require measured phone acceptance. Read the acceptance table for the latest results.
+Run the Room fixture with Restricted Mode off: its separate database still shares the boot-session preference mirror. Keep tests narrowly scoped and understand their state changes before running. Instrumentation force-stops the target process; on this phone it left Accessibility malfunctioning until a manual off/on toggle. Do not use stock adb shell uiautomator dump for service-resilience assertions: it suppresses Accessibility by default. Prefer input/dumpsys and app-only screenshots, or UiAutomation configured with FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES. Coordinate UI taps with the user and verify the foreground screen; shared device interaction can invalidate old coordinates. Broader browser coverage, interrupted breaks, process/reboot recovery, Settings/Recents classification, Device Admin, password timing and battery cost still require measured phone acceptance. Shared exhaustion, cap across an hour boundary, break UI recovery and short TIMER locks are now measured; read the latest table. Read the acceptance table for the latest results.
 
 ## History and maintenance
 
 GitHub publishing is authorized. The user repaired normal authentication and pushed the branches; a subsequent noninteractive remote check succeeded. Push normal local commits through credential-manager authentication; never reuse the token pasted into the initial conversation.
 
 When changing behavior, update the relevant design/development/testing notes. Add comments explaining lifecycle ownership, clock assumptions, mutation guards and durable state boundaries. Finish with a concise account of changed behavior, actual verification, and remaining measured limitations. Avoid claiming all restart scenarios work based only on persisted data or JVM tests.
+
+## Current extension
+
+The user approved retaining shell-only ADB maintenance controls in final builds. Read [the API and helper guide](adb-control.md) and [extension plan](superpowers/plans/2026-10-03-adb-maintenance.md). The main-source provider requires caller DUMP permission and UID 2000; every policy write still uses transactional AppStore guards. It provides no password/release/grant/reset endpoint. Do not remove it merely because a build is release.
+
+Current phone configuration restored after cap acceptance: shared quota 15 minutes per clock hour, continuous cap off, break five minutes; both editable presets enabled. Restricted Mode off. Next checks: password-policy release, reboot/screen-off recovery, optional admin and Settings/Recents protections. ADB profile import uses the same importer and must refuse active locks.
