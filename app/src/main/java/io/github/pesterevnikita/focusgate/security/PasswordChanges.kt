@@ -18,6 +18,22 @@ object PasswordAttempts {
 /** Password lifecycle rules operate on the transaction's latest state, rather than a stale UI snapshot. */
 object PasswordChanges {
     /**
+     * Removing a saved verifier requires its current password and an unlocked configuration.
+     * This does not release a session or change blockers; subsequent setup is ordinary first-time setup.
+     */
+    fun remove(state: AppState, currentPassword: CharArray, nowUtcMillis: Long): PasswordChangeResult = try {
+        when {
+            state.session!=null -> PasswordChangeResult(state,"Release Restricted Mode before removing the password.")
+            state.password==null -> PasswordChangeResult(state)
+            nowUtcMillis<state.retryAfterUtcMillis -> PasswordChangeResult(state,"Try again after ${Instant.ofEpochMilli(state.retryAfterUtcMillis)}.")
+            !PasswordVerifier.verify(currentPassword,state.password) -> PasswordChangeResult(PasswordAttempts.failed(state,nowUtcMillis),"Incorrect current password.")
+            else -> PasswordChangeResult(state.copy(password=null,failures=0,retryAfterUtcMillis=0))
+        }
+    } finally {
+        currentPassword.fill('\u0000')
+    }
+
+    /**
      * Initial setup needs confirmation; replacement additionally verifies the current password.
      * Consume every caller-owned character buffer on success, refusal or crypto failure.
      */

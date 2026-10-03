@@ -11,6 +11,7 @@ Read [docs/development.md](docs/development.md) before changing code. It contain
 - The release-retained ADB maintenance provider is explicitly approved. Keep it shell-only (UID 2000 plus caller DUMP permission), offline, and subject to normal transactional guards; expose no password, unlock, grant or reset endpoint. Read docs/adb-control.md before using it.
 - Preserve atomic policy/session/usage persistence and restrictive-only mutation checks. New locks offer Password only, Timer only and Password OR timer. Retain AND decoding/release only for existing legacy sessions; reject creating new AND locks. Password changes require current/new/repeated-new input when a verifier already exists. Preserve saved credentials and remembered lock choices across release/relock.
 - Ordinary Device Admin is optional friction. Never claim it grants device-owner uninstall prevention or guarantees service availability.
+- Password removal requires the current password while unlocked and shares persisted retry throttling. Without a verifier, first-time/replacement setup asks only for new/repeated input; Password-only/OR starts are unavailable, Timer-only remains possible. Never silently convert OR to Timer-only or expose a saved password through the input visibility toggle.
 
 ## Engineering workflow
 

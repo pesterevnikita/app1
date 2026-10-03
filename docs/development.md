@@ -59,7 +59,7 @@ $env:JAVA_HOME = '<JDK_21>'
 
 If a development proxy is required, configure it locally. Do not publish its address or credentials.
 
-The latest full verification passed 65 unit tests, lint with zero errors/five warnings, and assembled debug and unsigned release APKs. The separate instrumentation APK was built and exercised earlier. One Room instrumentation test also passed on the Xiaomi. Reports are in `policy/build/test-results/test/`, `app/build/test-results/testDebugUnitTest/`, and `app/build/reports/`.
+The latest full verification passed 69 unit tests, lint with zero errors/five warnings, and assembled debug and unsigned release APKs. The separate instrumentation APK was built and exercised earlier. One Room instrumentation test also passed on the Xiaomi. Reports are in `policy/build/test-results/test/`, `app/build/test-results/testDebugUnitTest/`, and `app/build/reports/`.
 
 ## Device workflow
 
@@ -102,4 +102,10 @@ Password lifecycle follow-up: the user reported blind replacement and unclear sa
 
 UI follow-up: Restricted Mode separates status/password/session/device protections into cards. More uses setup, display, backups, help, developer tools, and about/support sections; secondary help is collapsed. The blocker editor uses explicit Always block during schedule / Allow limited usage radio choices. Protection edits pass their original settings snapshot to the transaction to reject stale concurrent updates.
 
-Current password/UI follow-up verification: 65 JVM tests pass, lint reports zero errors/five warnings, debug/release assembly passes. Updated app is installed and password-set status plus the change dialog and grouped screens are visually verified. The user is privately testing current-password refusal/replacement; do not control or capture their screen while they type. Then continue short OR release/relock and remaining device acceptance.
+The user reports the password/UI follow-up works as intended. Treat this as general user confirmation, not a measured release-policy matrix. Continue short OR release/relock and remaining device acceptance separately.
+
+Password removal/visibility follow-up: `PasswordChanges.remove` verifies the latest stored credential and persists the same failed-attempt delay as change/unlock. `AppStore.removePassword` performs it transactionally, refuses active sessions, clears caller buffers, and leaves policy/usage/preferences intact. No ADB credential endpoint was added. `ui/PasswordInput` supplies independent, initially masked eye controls for setup, change, removal and unlock. Transient input/visibility is not saved across dialog recreation.
+
+The removal dialog explains that Password-only and OR starts need a saved password, while Timer-only remains available by explicit selection and has no early password override. Removing a password never silently converts a remembered OR choice to Timer. A new password can be set afterwards without old-password input. Remembered mode/duration/additions remain intact until a different successful lock updates them. Four new lifecycle regressions cover removal, fresh setup, lock-start prerequisites, incorrect/stale attempts and cooldown, locked refusal, and input clearing. See the current acceptance record for verification and installation results.
+
+This update passed 69 tests, lint (zero errors/five existing warnings), and both APK builds; read-only review found no issues. Debug update installed successfully, Accessibility/foreground reconnected, and presets/usage stayed unchanged. On-phone checks verified the removal explanation and initially hidden/revealed/reopened-hidden eye behavior using disposable text, then cancelled. The user's existing password was not removed or read. The user was invited to privately test removal and fresh setup; screen control is finished while that check is pending.

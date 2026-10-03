@@ -86,5 +86,59 @@ class PasswordLifecycleTest {
         assertEquals(1200000L,relocked.session!!.deadlineUtcMillis)
         assertEquals(released.password,relocked.password)
     }
+    @Test fun confirmedRemovalPreservesConfigurationAndAllowsFreshSetupWithoutOldPassword() {
+        val state=saved().copy(policy=PresetFactory.create(),ledger=LedgerState(consumed=mapOf("g" to 5000)),lockPreferences=LockPreferences())
+        val old="old-secret".toCharArray()
+        val removed=PasswordChanges.remove(state,old,100000)
+        assertNull(removed.error); assertNull(removed.state.password); assertTrue(old.all{it=='\u0000'})
+        assertEquals(state.policy,removed.state.policy); assertEquals(state.ledger,removed.state.ledger)
+        assertEquals(state.lockPreferences,removed.state.lockPreferences)
+        assertEquals(0,removed.state.failures); assertEquals(0L,removed.state.retryAfterUtcMillis)
+        for(mode in listOf(ReleasePolicy.PASSWORD,ReleasePolicy.PASSWORD_OR_TIMER)) {
+            assertTrue(runCatching{LockSessionChanges.start(removed.state,mode,60000,true,true,clock(100000,1000))}.isFailure)
+        }
+        val timer=LockSessionChanges.start(removed.state,ReleasePolicy.TIMER,60000,true,true,clock(100000,1000),rememberPreferences=false)
+        assertEquals(ReleasePolicy.TIMER,timer.session!!.releasePolicy)
+        assertEquals(state.lockPreferences,timer.lockPreferences)
+        val replaced=change(removed.state,old="",next="fresh-secret")
+        assertNull(replaced.error); assertTrue(PasswordVerifier.verify("fresh-secret".toCharArray(),replaced.state.password!!))
+        val choices=replaced.state.lockPreferences!!
+        val resumed=LockSessionChanges.start(replaced.state,choices.releasePolicy,choices.durationMillis,choices.allowRestrictiveAdditions,true,clock(200000,101000))
+        assertEquals(ReleasePolicy.PASSWORD_OR_TIMER,resumed.session!!.releasePolicy)
+        assertEquals(choices,resumed.lockPreferences)
+    }
+    @Test fun wrongOrMissingRemovalPasswordRetainsVerifierAndUsesExistingThrottle() {
+        val state=saved()
+        val missing=PasswordChanges.remove(state,charArrayOf(),100000)
+        assertNotNull(missing.error); assertEquals(state.password,missing.state.password)
+        assertEquals(1,missing.state.failures); assertEquals(102000L,missing.state.retryAfterUtcMillis)
+        val old="old-secret".toCharArray()
+        val retry=PasswordChanges.remove(missing.state,old,101000)
+        assertNotNull(retry.error); assertEquals(missing.state,retry.state); assertTrue(old.all{it=='\u0000'})
+        val wrong="incorrect".toCharArray()
+        val second=PasswordChanges.remove(missing.state,wrong,102000)
+        assertNotNull(second.error); assertEquals(2,second.state.failures)
+        assertEquals(106000L,second.state.retryAfterUtcMillis); assertTrue(wrong.all{it=='\u0000'})
+        assertNull(PasswordChanges.remove(second.state,"old-secret".toCharArray(),106000).state.password)
+    }
+    @Test fun removalRefusesEveryActiveLockIncludingTimerAndClearsInput() {
+        for(mode in ReleasePolicy.entries) {
+            val state=saved().copy(session=LockedSession("s",mode,60000,60000,"b","UTC"))
+            val old="old-secret".toCharArray()
+            val result=PasswordChanges.remove(state,old,100000)
+            assertNotNull(result.error); assertEquals(state,result.state); assertTrue(old.all{it=='\u0000'})
+        }
+    }
+    @Test fun staleRemovalAfterPasswordChangeFailsAndMissingVerifierIsHarmless() {
+        val changed=change(saved(),next="replacement-secret").state
+        val stale="old-secret".toCharArray()
+        val result=PasswordChanges.remove(changed,stale,100000)
+        assertNotNull(result.error); assertEquals(changed.password,result.state.password)
+        assertTrue(stale.all{it=='\u0000'})
+        val absent=AppState();val unused="unused".toCharArray()
+        val noOp=PasswordChanges.remove(absent,unused,100000)
+        assertEquals(absent,noOp.state); assertNull(noOp.error)
+        assertTrue(unused.all{it=='\u0000'})
+    }
     private fun clock(utc:Long,elapsed:Long)=ClockSnapshot(Instant.ofEpochMilli(utc),elapsed,"boot","UTC")
 }

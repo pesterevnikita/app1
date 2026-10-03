@@ -69,6 +69,18 @@ class AppStore(private val context: Context, name: String = "focusgate.db") {
         // Also clear buffers if storage/cancellation fails before the helper is reached.
         currentPassword.fill('\u0000'); newPassword.fill('\u0000'); confirmation.fill('\u0000')
     }
+    /** Confirm against the latest durable verifier, preserving failure throttling and every configuration field. */
+    suspend fun removePassword(currentPassword: CharArray): String? = try {
+        var refused: String?=null
+        val failure=transact { current ->
+            val result=PasswordChanges.remove(current,currentPassword,clock.now().instant.toEpochMilli())
+            refused=result.error; result.state
+        }
+        failure ?: refused
+    } finally {
+        // Storage failures can occur before the helper; the caller's buffer must still be consumed.
+        currentPassword.fill('\u0000')
+    }
     suspend fun preferences(diagnostics: Boolean, countdown: Boolean, popup: Boolean): String? = transact{it.copy(diagnostics=diagnostics,countdown=countdown,popup=popup)}
     /** Lock configuration, not blocker activation. Both deadline clocks are persisted to survive restarts. */
     suspend fun start(mode: ReleasePolicy, durationMillis: Long, additions: Boolean, accessibilityConnected: Boolean, rememberPreferences: Boolean = true): String? = transact {

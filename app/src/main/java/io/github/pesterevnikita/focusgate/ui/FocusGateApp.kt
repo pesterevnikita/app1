@@ -17,7 +17,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -122,7 +121,7 @@ private fun minutes(ms: Long)=String.format(java.util.Locale.getDefault(),"%d:%0
                             Text("Enabled blockers work whether configuration is locked or unlocked.")
                         }
                         if(session==null) {
-                            SettingsSection("Password") { PasswordManagement(state.password!=null,store::updatePassword) }
+                            SettingsSection("Password") { PasswordManagement(state.password!=null,store::updatePassword,store::removePassword) }
                             SettingsSection("Lock session") { LockControls(state,connected,{disclosure=true},::action) }
                         } else SettingsSection("Active session") {
                             Text("Release: ${releaseLabel(session.releasePolicy)}")
@@ -175,12 +174,14 @@ private fun minutes(ms: Long)=String.format(java.util.Locale.getDefault(),"%d:%0
                                 Text("Expiry unlocks configuration. Enabled blockers keep working until you change them.")
                                 Text("Do I set the password again?",style=MaterialTheme.typography.titleSmall)
                                 Text("No. It stays saved across expiry and new locks. Each Start begins a fresh duration. Changing the password requires the current password and matching new entries.")
+                                Text("Can I remove the password?",style=MaterialTheme.typography.titleSmall)
+                                Text("Yes, while configuration is unlocked, using Remove password and your current password. Password only and Password OR timer then require a new password. You can choose Timer only, which has no early password release. Setting a new password after removal needs no old password.")
                                 Text("Is the allowance shared?",style=MaterialTheme.typography.titleSmall)
                                 Text("Yes, across the targets in a quota group. A clock-hour reset grants another allowance. An optional continuous-session cap limits use across that boundary.")
                                 Text("What happens when a browser URL is unknown?",style=MaterialTheme.typography.titleSmall)
                                 Text("Website rules allow it. App rules still apply. Private tabs and embedded browsers may not expose a URL.")
                                 Text("What if I forget the password?",style=MaterialTheme.typography.titleSmall)
-                                Text("Your selected timer policy still applies. Password-only requires the password. There is no built-in password reset.")
+                                Text("Your selected timer policy still applies. Password-only requires the password. Changing or removing a saved password requires the current one; there is no forgotten-password reset.")
                                 Text("Can I uninstall or stop the app?",style=MaterialTheme.typography.titleSmall)
                                 Text("Device Admin may require deactivation before uninstalling. Settings protection adds friction while Accessibility runs. Force-stop can interrupt enforcement even though your configuration remains saved; reopen and check Accessibility afterward.")
                                 Text("Does background playback count?",style=MaterialTheme.typography.titleSmall)
@@ -247,7 +248,7 @@ private fun minutes(ms: Long)=String.format(java.util.Locale.getDefault(),"%d:%0
 @Composable private fun PreferenceRow(label: String,checked: Boolean,enabled: Boolean=true,onChange: (Boolean)->Unit) {Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){Text(label,Modifier.weight(1f));Spacer(Modifier.width(12.dp));Switch(checked=checked,onCheckedChange=onChange,enabled=enabled)}}
 @Composable private fun PasswordField(label: String,button: String,onSubmit:(CharArray)->Unit,enabled: Boolean=true) {
     var value by remember{mutableStateOf("")}
-    OutlinedTextField(value,onValueChange={value=it},label={Text(label)},visualTransformation=PasswordVisualTransformation(),singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),enabled=enabled,modifier=Modifier.fillMaxWidth())
+    PasswordInput(label,value,enabled){value=it}
     Button(enabled=enabled && value.isNotEmpty(),onClick={val chars=value.toCharArray();value="";onSubmit(chars)}){Text(button)}
 }
 /** Collect release conditions before starting a lock; the store repeats the safety checks. */
@@ -260,10 +261,11 @@ private fun minutes(ms: Long)=String.format(java.util.Locale.getDefault(),"%d:%0
     var additions by remember{mutableStateOf(saved.allowRestrictiveAdditions)}
     var acknowledged by remember{mutableStateOf(false)}
     Text("Release condition")
-    modes.forEach{entry->ChoiceRow(releaseLabel(entry),mode==entry){mode=entry}}
+    modes.forEach{entry->ChoiceRow(releaseLabel(entry),mode==entry,enabled=entry==ReleasePolicy.TIMER || state.password!=null){mode=entry}}
+    if(state.password==null) Text("No password set. Choose Timer only, or set a password above to use either password option.")
     Text(when(mode) {
-        ReleasePolicy.PASSWORD_OR_TIMER -> "The saved password unlocks early, or the timer unlocks automatically."
-        ReleasePolicy.PASSWORD -> "The saved password is required to unlock. There is no automatic expiry."
+        ReleasePolicy.PASSWORD_OR_TIMER -> if(state.password==null) "Password OR timer cannot start without a password. It does not automatically become Timer only." else "The saved password unlocks early, or the timer unlocks automatically."
+        ReleasePolicy.PASSWORD -> if(state.password==null) "Password only cannot start without a password." else "The saved password is required to unlock. There is no automatic expiry."
         else -> "The timer unlocks automatically. A password cannot end this session early."
     })
     if(mode!=ReleasePolicy.PASSWORD) {

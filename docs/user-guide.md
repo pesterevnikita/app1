@@ -61,11 +61,17 @@ New sessions offer the three choices above. Existing persisted legacy **Password
 
 Expiry/release unlocks settings and **leaves enabled blockers running**. To stop a blocker, disable it after release. Early OR release lets you change rules and start a new session; it is not a timed pause with automatic re-enablement. Each start uses a fresh duration measured from that start. The last successfully started mode, duration, and restrictive-additions choice are remembered locally for the next start; a short maintenance timer must not replace those preferences.
 
-### Set, reuse, and change a password
+### Set, reuse, change, and remove a password
 
-The updated password flow is under implementation; phone verification is pending. While unlocked, the initial setup asks for **New password** and **Repeat password**, then shows whether a password is saved without displaying it. Have a trusted person set and keep it. The saved password remains available after expiry/release and is reused for subsequent password-based locks; you do not need to set it for each session.
+While unlocked, **Set password** asks for **New password** and **Repeat new password**; there is no current-password field when no password is saved. Have a trusted person set and keep it. The saved password remains available after expiry/release and is reused for subsequent password-based locks; you do not need to set it for each session.
 
-To change a saved password while unlocked, enter **Old password**, **New password**, and **Repeat password**. The old password must be correct and the new entries must agree. Incorrect old-password attempts are throttled; knowing that configuration is unlocked does not permit replacing the saved password without it. Password changes are refused while locked. There is no password-reset or **forgot password** bypass. Retry delays must not postpone automatic timer release.
+To change a saved password while unlocked, choose **Change password** and enter **Current password**, **New password**, and **Repeat new password**. The current password must be correct and the new entries must agree. Incorrect current-password attempts are throttled; knowing that configuration is unlocked does not permit replacing the saved password without it.
+
+To remove it, choose **Remove password**, review the explanation, and enter the current password. Blockers, usage counters, and remembered lock choices stay unchanged. The status becomes **No password set**, and later setup asks only for a new password and its confirmation.
+
+Without a saved password, **Password only** and **Password OR timer** cannot start. **Password OR timer does not automatically become Timer only.** You must explicitly choose **Timer only**, which cannot end early with a password, or set a new password to use the password options again. Removing a password cannot affect an active lock: first release Restricted Mode normally. Both changing and removing require the current password even after a timer expires; there is no **forgot password** bypass. Retry delays do not postpone automatic timer release.
+
+Every password field has an eye button to show or hide what you are typing. Each field starts hidden; clearing it or reopening the dialog hides it again. This only reveals the current input, never the saved password.
 
 While locked, weakening rules, deleting/disabling blockers, raising budgets, reducing protections, changing release credentials, resetting counters, and importing configurations are prohibited. If restrictive additions were enabled before starting, allowed additions include a new enabled independent blocker, extra targets, and lower allowances. They cannot be undone during the session. Arbitrary schedule/regex edits are not accepted as provably restrictive. Harmless appearance preferences and configuration export remain available.
 
@@ -93,7 +99,7 @@ Donation network/address placeholders are empty until supplied by the maintainer
 
 **Why can I use 30 minutes around an hour boundary?** Each clock hour grants its own 15 minutes. Enable a continuous-session cap if you want a break across that boundary.
 
-**What if I forget the password?** OR and timer-only release at the deadline. Password-only has no timer release. An existing legacy AND lock still requires the password after the deadline. Changing a saved password requires the old password even while unlocked; there is no reset bypass. Import cannot provide an escape or reset an active session.
+**What if I forget the password?** OR and timer-only release at the deadline. Password-only has no timer release. An existing legacy AND lock still requires the password after the deadline. Changing or removing a saved password requires the current password even while unlocked; there is no forgotten-password reset. Import cannot provide an escape or reset an active session.
 
 **Must I enter a new password after each timer ends?** No. The saved password is reused after release and on each subsequent password-based lock. Each new timed lock starts a fresh duration; remembered choices do not reuse an old deadline.
 
