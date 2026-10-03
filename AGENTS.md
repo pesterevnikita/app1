@@ -9,7 +9,7 @@ Read [docs/development.md](docs/development.md) before changing code. It contain
 - The default allowance is **combined** across Chrome, Edge, Telegram, and Ozon shopping: 15 minutes per clock hour. Clock-hour boundary bursts are accepted. Optional continuous-session limits and breaks are separately configurable.
 - Evaluate overlapping applicable rules with denial taking precedence. Bill overlapping shared groups once. Unknown browser URLs are allowed unless an independent app rule denies access.
 - The release-retained ADB maintenance provider is explicitly approved. Keep it shell-only (UID 2000 plus caller DUMP permission), offline, and subject to normal transactional guards; expose no password, unlock, grant or reset endpoint. Read docs/adb-control.md before using it.
-- Preserve atomic policy/session/usage persistence and restrictive-only mutation checks. Password AND timer requires both at release time; an earlier correct password must not preauthorize release.
+- Preserve atomic policy/session/usage persistence and restrictive-only mutation checks. New locks offer Password only, Timer only and Password OR timer. Retain AND decoding/release only for existing legacy sessions; reject creating new AND locks. Password changes require current/new/repeated-new input when a verifier already exists. Preserve saved credentials and remembered lock choices across release/relock.
 - Ordinary Device Admin is optional friction. Never claim it grants device-owner uninstall prevention or guarantees service availability.
 
 ## Engineering workflow

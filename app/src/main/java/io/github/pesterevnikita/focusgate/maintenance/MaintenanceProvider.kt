@@ -48,7 +48,7 @@ class MaintenanceProvider: ContentProvider() {
                     when(command) {
                         is MaintenanceCommand.Policy -> checkSaved(Graph.store.updatePolicy(command.value,command.expectedRevision))
                         is MaintenanceCommand.Protections -> checkSaved(Graph.store.updateSettings(command.value,command.expectedSettings))
-                        is MaintenanceCommand.Lock -> checkSaved(Graph.store.start(ReleasePolicy.TIMER,command.durationMillis,true,ServiceStatus.connected.value))
+                        is MaintenanceCommand.Lock -> checkSaved(Graph.store.start(ReleasePolicy.TIMER,command.durationMillis,true,ServiceStatus.connected.value,rememberPreferences=false))
                         is MaintenanceCommand.Import -> checkSaved(Graph.store.importConfiguration(command.json,command.merge))
                         is MaintenanceCommand.Read -> Unit
                     }

@@ -2,9 +2,9 @@
 
 FocusGate is a native Android self-control app designed to redirect selected apps and known matching websites to Home. Rules, shared usage budgets, and configuration stay on the phone.
 
-**Status: 0.1 development APK installed; 57 unit tests and one on-device Room test pass. Phone acceptance is partial.** Native blocking, initial Chrome/Edge website cases, and swipe-away enforcement were observed on the Xiaomi 11T; full browser/restart/lock coverage remains unverified. See [verification results](docs/testing/phone-acceptance.md), the [accepted design](docs/superpowers/specs/2026-10-03-focusgate-design.md), [implementation plan](docs/superpowers/plans/2026-10-03-focusgate.md), and [user guide](docs/user-guide.md).
+**Status: 0.1 development APK installed; 65 unit tests and one on-device Room test pass. Phone acceptance is partial.** Native blocking, initial Chrome/Edge website cases, and swipe-away enforcement were observed on the Xiaomi 11T; full browser/restart/lock coverage remains unverified. See [verification results](docs/testing/phone-acceptance.md), the [accepted design](docs/superpowers/specs/2026-10-03-focusgate-design.md), [implementation plan](docs/superpowers/plans/2026-10-03-focusgate.md), and [user guide](docs/user-guide.md).
 
-The editable presets offer continuous YouTube/Instagram blocking and a combined 15-minute allowance per clock hour for Chrome, Edge, Telegram, and Ozon shopping. An optional continuous-session cap adds a required break. Restricted Mode locks configuration; enabled blockers work even when that mode is off. Password OR timer release is the default design, with password-only, timer-only, and password AND timer choices.
+The editable presets offer continuous YouTube/Instagram blocking and a combined 15-minute allowance per clock hour for Chrome, Edge, Telegram, and Ozon shopping. An optional continuous-session cap adds a required break. Restricted Mode locks configuration; enabled blockers work even when that mode is off. Password OR timer release is the default design, with password-only and timer-only alternatives. The saved password is reused across locks; changing it requires the current password and confirmation of the new one.
 
 ## Build and install
 

@@ -152,11 +152,11 @@ Release choices:
 | Password only | Correct trusted-person password |
 | Timer only | Deadline reached |
 | Password OR timer — proposed default | Either condition |
-| Password AND timer | Deadline reached and correct password |
 
-Offer durations such as one day, one week, and custom duration. Explicitly summarize the consequences before starting, especially no automatic release for Password only and Password AND timer.
 
-Release occurs only when the selected condition is satisfied and returns to editable configuration. For Password AND timer, a correct password before the deadline does not release the session or pre-authorize later release; the password must be entered at or after the deadline. No automatic blocker disabling. With Password OR timer, a trusted person can release early; the user can then disable selected ordinary blockers and start a new locked session anytime. A timed temporary pause with automatic re-enablement is a separate future feature, not an implied first-release password action. Timer-only controls expose no password override. No “forgot password” bypass while locked. Lost-password guidance must explain that the selected release policy still applies; app data removal is outside the protection guarantee.
+Offer durations such as one day, one week, and custom duration. Explicitly summarize the consequences before starting, especially no automatic release for Password only. Remember the last successful mode/duration/additions locally; every Start computes a new deadline from that moment and reuses the saved password.
+
+Release occurs only when the selected condition is satisfied and returns to editable configuration. Password AND timer is removed from new-session choices following user review. Existing persisted AND sessions retain their original release condition; never weaken an active session during an upgrade. No automatic blocker disabling. With Password OR timer, a trusted person can release early; the user can then disable selected ordinary blockers and start a new locked session anytime. A timed temporary pause with automatic re-enablement is a separate future feature, not an implied first-release password action. Timer-only controls expose no password override. No “forgot password” bypass while locked. Lost-password guidance must explain that the selected release policy still applies; app data removal is outside the protection guarantee.
 
 ### 6.2 Protected mutations
 
@@ -334,3 +334,7 @@ The first release is usable only when both target scenarios and all core lock/re
 The user reviewed and accepted the design with the corrections recorded in section 1. Approved decisions: clock-hour budgets, Password OR timer default, allow unknown URLs, restrictive-only additions, editable presets, ordinary Device Admin/Settings friction, and FocusGate name. The user subsequently requested an optional continuous-session cap; include it in the first release with the proposed configurable defaults in section 4.3. Review the implementation plan before starting product code.
 
 No donation address, signing secret, GitHub token, or private phone identifier belongs in this repository.
+
+## Password lifecycle clarification (user follow-up)
+
+Display explicit Password set / No password set status. Initial setup uses new password plus repeated confirmation. A separate Change password action requires current password, new password, and repeated confirmation. Verify current credentials inside the durable transaction, preserve the verifier on failure, apply persisted retry delays to incorrect current-password attempts, and refuse changes during active Restricted Mode. Release/expiry never deletes the password. A new session reuses it and starts the full selected duration afresh. Password-only start must not depend on text in an inactive duration field.

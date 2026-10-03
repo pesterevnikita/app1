@@ -10,11 +10,16 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.github.pesterevnikita.focusgate.Graph
 import io.github.pesterevnikita.focusgate.accessibility.ServiceStatus
@@ -109,52 +114,96 @@ private fun minutes(ms: Long)=String.format(java.util.Locale.getDefault(),"%d:%0
                             }}
                         }
                     }
-                    1 -> Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                        Text(if(state.session==null) "Configuration unlocked" else "Restricted Mode active",style=MaterialTheme.typography.titleLarge)
-                        Text(if(connected) "Accessibility connected" else "Enforcement unavailable: Accessibility disconnected",color=if(connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                    1 -> Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom=24.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
                         val session=state.session
-                        if(session==null) LockControls(state,connected,{disclosure=true},::action)
-                        else {
-                            Text("Release: ${session.releasePolicy.name.replace('_',' ')}")
-                            Text(session.deadlineUtcMillis?.let{"Lock time left: ${minutes(it-now)}"} ?: "No automatic deadline")
-                            Text("Release unlocks editing. Blockers stay enabled until you change them.")
-                            PasswordField("Trusted-person password","Release",{chars->action{store.release(chars)}},enabled=session.releasePolicy!=ReleasePolicy.TIMER)
+                        SettingsSection("Status") {
+                            Text(if(session==null) "Configuration unlocked" else "Restricted Mode active",style=MaterialTheme.typography.titleMedium)
+                            Text(if(connected) "Accessibility connected" else "Enforcement unavailable: Accessibility disconnected",color=if(connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                            Text("Enabled blockers work whether configuration is locked or unlocked.")
+                        }
+                        if(session==null) {
+                            SettingsSection("Password") { PasswordManagement(state.password!=null,store::updatePassword) }
+                            SettingsSection("Lock session") { LockControls(state,connected,{disclosure=true},::action) }
+                        } else SettingsSection("Active session") {
+                            Text("Release: ${releaseLabel(session.releasePolicy)}")
+                            Text(session.deadlineUtcMillis?.let{"Lock time left: ${minutes(it-now)}"} ?: "No automatic deadline",style=MaterialTheme.typography.titleMedium)
+                            Text("Unlocking allows editing. Your password stays saved and blockers stay enabled.")
+                            if(session.releasePolicy!=ReleasePolicy.TIMER) PasswordField("Trusted-person password","Unlock configuration",{chars->action{store.release(chars)}})
                             if(session.releasePolicy==ReleasePolicy.TIMER) Text("This session releases at its deadline; there is no password override.")
                         }
-                        ProtectionControls(state,::action)
+                        SettingsSection("Device protections") { ProtectionControls(state,::action) }
                     }
-                    2 -> Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                        Text("Setup and health",style=MaterialTheme.typography.titleLarge)
-                        Text(if(connected) "Accessibility: connected" else "Accessibility: missing/disconnected")
-                        val foreground by ServiceStatus.foreground.collectAsState()
-                        Text(if(foreground) "Background protection: active" else "Background protection: inactive. With enabled blockers, reopen FocusGate to retry.")
-                        Button(onClick={disclosure=true}){Text("Accessibility setup")}
-                        Text("Xiaomi / HyperOS setup: enable FocusGate in Background autostart, then choose No restrictions in Battery saver. Background autostart is separate from Other permissions → Start in background. These switches cannot be reliably verified by a normal app.")
-                        OutlinedButton(enabled=state.session==null && state.settings.settingsMode==0,onClick={SetupScreens.autostart(context)}){Text("Open Background autostart")}
-                        OutlinedButton(enabled=state.session==null && state.settings.settingsMode==0,onClick={SetupScreens.battery(context)}){Text("Open Battery saver")}
-                        Text("If Accessibility says malfunctioning, turn FocusGate off and on in Accessibility settings. Reopening the app alone may not reconnect it. After setup, remove FocusGate from Recents and test a blocked app again.",style=MaterialTheme.typography.bodySmall)
-                        Text("A persistent service notification helps keep enforcement alive without extra polling. Android or HyperOS can still interrupt it. Notification visibility is optional; granting notifications lets you see the status.",style=MaterialTheme.typography.bodySmall)
-                        if(Build.VERSION.SDK_INT>=33) OutlinedButton(onClick={notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)}){Text("Allow status notifications")}
-                        OutlinedButton(enabled=state.session==null && state.settings.settingsMode==0,onClick={context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:${context.packageName}")))}){Text("Open app setup settings")}
-                        Text("If Settings protection prevents repair, release the session with its configured password/deadline first. No general repair bypass is offered.",style=MaterialTheme.typography.bodySmall)
-                        val browser by ServiceStatus.browser.collectAsState(); Text(browser)
-                        Text("Sensitive Settings and Recents: experimental, phone verification pending. Whole-Settings mode is broader; select it explicitly.",style=MaterialTheme.typography.bodySmall)
-                        PreferenceRow("Remaining-time notification",state.countdown){enabled->if(enabled && Build.VERSION.SDK_INT>=33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS); action{store.preferences(state.diagnostics,enabled,state.popup)}}
-                        PreferenceRow("Show block explanation",state.popup){action{store.preferences(state.diagnostics,state.countdown,it)}}
-                        PreferenceRow("Local developer diagnostics",state.diagnostics){action{store.preferences(it,state.countdown,state.popup)}}
-                        Row {OutlinedButton(onClick={export.launch("focusgate-config.json")}){Text("Export")}; Spacer(Modifier.width(8.dp)); OutlinedButton(enabled=state.session==null,onClick={import.launch(arrayOf("application/json","text/plain"))}){Text("Import")}}
-                        OutlinedButton(onClick={exportLogs.launch("focusgate-diagnostics.txt")}){Text("Export local diagnostics")}
-                        MatchTester()
-                        Text("Why FocusGate?",style=MaterialTheme.typography.titleLarge)
-                        Text("FocusGate adds a pause between an impulse and another hour of scrolling. Choose your rules, test them, then lock them for a commitment you want to keep. Your settings stay on this phone.")
-                        Text("Quick guide",style=MaterialTheme.typography.titleLarge)
-                        Text("1. Grant Accessibility after reading the disclosure.\n2. Add/edit presets and test redirection.\n3. Ask a trusted person to set the password.\n4. Test a short Restricted Mode session before a day/week.\n5. Release with the selected policy, edit blockers, and lock again anytime.")
-                        Text("FAQ",style=MaterialTheme.typography.titleLarge)
-                        Text("Why does blocking continue after expiry? Expiry unlocks configuration; it does not disable blockers.\n\nIs 15 minutes shared? Yes, across all targets in that quota group. A clock-hour reset permits another allowance; enable a continuous cap to prevent long sessions across boundaries.\n\nUnknown browser URL? Allowed by website rules. App quotas still apply. Embedded/private browsers may not expose URLs.\n\nCan I uninstall? Device Admin may require deactivation first. Settings protection adds friction while Accessibility runs, but this is not a device-owner security guarantee.\n\nForgot password? Your selected timer policy still applies. Password-only / password AND timer needs the password. There is no built-in reset bypass.\n\nDoes background playback count? No; the app redirects foreground UI and does not stop background audio.\n\nIs it offline? FocusGate has no networking permission. A cloud file provider or another app can use its own network. Choose local files for exports.\n\nCan it survive force-stop? Policy persists, but Android can stop enforcement. Reopen and check Accessibility after suspension.")
-                        Text("Support development",style=MaterialTheme.typography.titleLarge)
-                        if(DonationConfig.DONATION_ADDRESS.isBlank()) Text("Donation details can be added in a future release. No payments or network requests are made.")
-                        else {Text(DonationConfig.DONATION_NETWORK); Text(DonationConfig.DONATION_ADDRESS); OutlinedButton(onClick={context.getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Donation address",DonationConfig.DONATION_ADDRESS))}){Text("Copy address")}}
-                        Text("0.1.0 development · phone acceptance pending",style=MaterialTheme.typography.bodySmall)
+                    2 -> Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom=24.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+                        SettingsSection("Protection status") {
+                            Text(if(connected) "Accessibility: connected" else "Accessibility: missing or disconnected",color=if(connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                            val foreground by ServiceStatus.foreground.collectAsState()
+                            Text(if(foreground) "Background protection: active" else "Background protection: inactive. With enabled blockers, reopen FocusGate to retry.")
+                            val browser by ServiceStatus.browser.collectAsState()
+                            Text(browser)
+                            Text("Sensitive Settings and Recents detection is experimental; phone verification is pending.",style=MaterialTheme.typography.bodySmall)
+                        }
+                        SettingsSection("Phone setup") {
+                            Text("On Xiaomi, enable Background autostart and choose No restrictions in Battery saver.")
+                            Button(onClick={disclosure=true}){Text("Set up Accessibility")}
+                            OutlinedButton(enabled=state.session==null && state.settings.settingsMode==0,onClick={SetupScreens.autostart(context)}){Text("Open Background autostart")}
+                            OutlinedButton(enabled=state.session==null && state.settings.settingsMode==0,onClick={SetupScreens.battery(context)}){Text("Open Battery saver")}
+                            OutlinedButton(enabled=state.session==null && state.settings.settingsMode==0,onClick={context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:${context.packageName}")))}){Text("Open app settings")}
+                            ExpandableDetails("Setup help") {
+                                Text("Background autostart is separate from Other permissions → Start in background. Check both the autostart and battery settings yourself; FocusGate cannot reliably verify them.")
+                                Text("If Accessibility says malfunctioning, turn FocusGate off and on in Accessibility settings. Reopening the app alone may not reconnect it. After setup, remove FocusGate from Recents and test a blocked app again.")
+                                Text("If Settings protection prevents repair, unlock configuration with your password or deadline, then turn off Settings protection.")
+                            }
+                        }
+                        SettingsSection("Display & feedback") {
+                            PreferenceRow("Show remaining time in a notification",state.countdown){enabled->if(enabled && Build.VERSION.SDK_INT>=33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS); action{store.preferences(state.diagnostics,enabled,state.popup)}}
+                            PreferenceRow("Show an explanation when blocked",state.popup){action{store.preferences(state.diagnostics,state.countdown,it)}}
+                            if(Build.VERSION.SDK_INT>=33) OutlinedButton(onClick={notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)}){Text("Allow status notifications")}
+                            Text("The background service uses a persistent notification to help keep enforcement running. Android or HyperOS can still interrupt it.",style=MaterialTheme.typography.bodySmall)
+                        }
+                        SettingsSection("Backups") {
+                            Text("Save or restore blocker configuration. Passwords, active sessions, usage counters and logs are excluded.")
+                            OutlinedButton(onClick={export.launch("focusgate-config.json")}){Text("Export configuration")}
+                            OutlinedButton(enabled=state.session==null,onClick={import.launch(arrayOf("application/json","text/plain"))}){Text("Import configuration")}
+                            if(state.session!=null) Text("Unlock configuration before importing.",style=MaterialTheme.typography.bodySmall)
+                        }
+                        SettingsSection("Help & FAQ") {
+                            ExpandableDetails("Read the guide and common questions") {
+                                Text("Getting started",style=MaterialTheme.typography.titleSmall)
+                                Text("1. Grant Accessibility after reading the disclosure.\n2. Add or edit blockers and test redirection.\n3. Ask a trusted person to set the password.\n4. Test a short Restricted Mode session before a day or week.\n5. Unlock, adjust your rules, and start a new session anytime.")
+                                HorizontalDivider()
+                                Text("Why does blocking continue after expiry?",style=MaterialTheme.typography.titleSmall)
+                                Text("Expiry unlocks configuration. Enabled blockers keep working until you change them.")
+                                Text("Do I set the password again?",style=MaterialTheme.typography.titleSmall)
+                                Text("No. It stays saved across expiry and new locks. Each Start begins a fresh duration. Changing the password requires the current password and matching new entries.")
+                                Text("Is the allowance shared?",style=MaterialTheme.typography.titleSmall)
+                                Text("Yes, across the targets in a quota group. A clock-hour reset grants another allowance. An optional continuous-session cap limits use across that boundary.")
+                                Text("What happens when a browser URL is unknown?",style=MaterialTheme.typography.titleSmall)
+                                Text("Website rules allow it. App rules still apply. Private tabs and embedded browsers may not expose a URL.")
+                                Text("What if I forget the password?",style=MaterialTheme.typography.titleSmall)
+                                Text("Your selected timer policy still applies. Password-only requires the password. There is no built-in password reset.")
+                                Text("Can I uninstall or stop the app?",style=MaterialTheme.typography.titleSmall)
+                                Text("Device Admin may require deactivation before uninstalling. Settings protection adds friction while Accessibility runs. Force-stop can interrupt enforcement even though your configuration remains saved; reopen and check Accessibility afterward.")
+                                Text("Does background playback count?",style=MaterialTheme.typography.titleSmall)
+                                Text("No. FocusGate redirects foreground apps and does not stop background audio.")
+                                Text("Is it offline?",style=MaterialTheme.typography.titleSmall)
+                                Text("FocusGate has no networking permission. A cloud file provider can use its own network, so choose local files for exports.")
+                            }
+                        }
+                        SettingsSection("Developer tools") {
+                            ExpandableDetails("Show diagnostics and website tester") {
+                                PreferenceRow("Record local diagnostics",state.diagnostics){action{store.preferences(it,state.countdown,state.popup)}}
+                                Text("Optional local event records for troubleshooting; no browsing history or passwords.",style=MaterialTheme.typography.bodySmall)
+                                OutlinedButton(onClick={exportLogs.launch("focusgate-diagnostics.txt")}){Text("Export diagnostics")}
+                                HorizontalDivider()
+                                MatchTester()
+                            }
+                        }
+                        SettingsSection("About & support") {
+                            Text("Choose rules that help you step away from distracting apps, then lock them for a commitment you want to keep.")
+                            Text("0.1.0 development · phone acceptance in progress",style=MaterialTheme.typography.bodySmall)
+                            if(DonationConfig.DONATION_ADDRESS.isBlank()) Text("Donation details may be added in a future release. No payments or network requests are made.")
+                            else {Text(DonationConfig.DONATION_NETWORK); Text(DonationConfig.DONATION_ADDRESS); OutlinedButton(onClick={context.getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Donation address",DonationConfig.DONATION_ADDRESS))}){Text("Copy address")}}
+                        }
                     }
                 }
             }
@@ -165,50 +214,108 @@ private fun minutes(ms: Long)=String.format(java.util.Locale.getDefault(),"%d:%0
     importText?.let {text-> val preview=ConfigurationTransfer.parseDocument(text); AlertDialog(onDismissRequest={importText=null},title={Text("Import preview")},text={Text("${preview.policy.blockers.size} blockers, ${preview.policy.groups.size} quota groups. No password, active session, counters or grants will be imported. Protection settings require fresh review. Choose merge or replace.")},confirmButton={TextButton(onClick={action{store.importConfiguration(text,true)};importText=null}){Text("Merge")}},dismissButton={Row{TextButton(onClick={action{store.importConfiguration(text,false)};importText=null}){Text("Replace")};TextButton(onClick={importText=null}){Text("Cancel")}}}) }
 }
 
-@Composable private fun PreferenceRow(label: String,checked: Boolean,enabled: Boolean=true,onChange: (Boolean)->Unit) {Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(label,Modifier.weight(1f));Switch(checked=checked,onCheckedChange=onChange,enabled=enabled)}}
+/** Group related controls without coupling their visibility to policy or persistence. */
+@Composable private fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Text(title,style=MaterialTheme.typography.titleLarge)
+            content()
+        }
+    }
+}
+
+/** Secondary help stays reachable without making everyday settings a wall of text. */
+@Composable private fun ExpandableDetails(title: String, content: @Composable ColumnScope.() -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    TextButton(onClick={expanded=!expanded},modifier=Modifier.fillMaxWidth()) {
+        Text(title,modifier=Modifier.weight(1f))
+        Spacer(Modifier.width(12.dp))
+        Text(if(expanded) "Hide −" else "Show +")
+    }
+    if(expanded) Column(verticalArrangement=Arrangement.spacedBy(10.dp),content=content)
+}
+
+/** The label and radio button form one accessible tap target, including disabled lock controls. */
+@Composable private fun ChoiceRow(label: String, selected: Boolean, enabled: Boolean=true, onSelect: () -> Unit) {
+    Row(Modifier.fillMaxWidth().selectable(selected=selected,enabled=enabled,role=Role.RadioButton,onClick=onSelect).heightIn(min=48.dp).padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically) {
+        RadioButton(selected=selected,onClick=null,enabled=enabled)
+        Spacer(Modifier.width(12.dp))
+        Text(label,color=if(enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha=0.38f))
+    }
+}
+
+@Composable private fun PreferenceRow(label: String,checked: Boolean,enabled: Boolean=true,onChange: (Boolean)->Unit) {Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){Text(label,Modifier.weight(1f));Spacer(Modifier.width(12.dp));Switch(checked=checked,onCheckedChange=onChange,enabled=enabled)}}
 @Composable private fun PasswordField(label: String,button: String,onSubmit:(CharArray)->Unit,enabled: Boolean=true) {
     var value by remember{mutableStateOf("")}
-    OutlinedTextField(value,onValueChange={value=it},label={Text(label)},visualTransformation=PasswordVisualTransformation(),enabled=enabled,modifier=Modifier.fillMaxWidth())
+    OutlinedTextField(value,onValueChange={value=it},label={Text(label)},visualTransformation=PasswordVisualTransformation(),singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),enabled=enabled,modifier=Modifier.fillMaxWidth())
     Button(enabled=enabled && value.isNotEmpty(),onClick={val chars=value.toCharArray();value="";onSubmit(chars)}){Text(button)}
 }
 /** Collect release conditions before starting a lock; the store repeats the safety checks. */
 @Composable private fun LockControls(state: AppState,connected: Boolean,setup:()->Unit,action: (suspend()->String?)->Unit) {
     val store=Graph.store
-    var mode by remember{mutableStateOf(ReleasePolicy.PASSWORD_OR_TIMER)}
-    var duration by remember{mutableStateOf("1440")}
-    var additions by remember{mutableStateOf(true)}
+    val saved=state.lockPreferences ?: LockPreferences()
+    val modes=listOf(ReleasePolicy.PASSWORD_OR_TIMER,ReleasePolicy.PASSWORD,ReleasePolicy.TIMER)
+    var mode by remember{mutableStateOf(saved.releasePolicy.takeIf{it in modes} ?: ReleasePolicy.PASSWORD_OR_TIMER)}
+    var duration by remember{mutableStateOf((saved.durationMillis/60000).toString())}
+    var additions by remember{mutableStateOf(saved.allowRestrictiveAdditions)}
     var acknowledged by remember{mutableStateOf(false)}
-    PasswordField(if(state.password==null) "Set trusted-person password (6+ chars)" else "Replace trusted-person password","Save password",{action{store.setPassword(it)}})
     Text("Release condition")
-    ReleasePolicy.entries.forEach{entry->Row(Modifier.clickable{mode=entry}.fillMaxWidth()){RadioButton(selected=mode==entry,onClick={mode=entry});Text(entry.name.replace('_',' '),Modifier.padding(top=12.dp))}}
-    Row {TextButton(onClick={duration="5"}){Text("5-min test")};TextButton(onClick={duration="1440"}){Text("Day")};TextButton(onClick={duration="10080"}){Text("Week")}}
-    OutlinedTextField(duration,{duration=it},label={Text("Duration in minutes")},enabled=mode!=ReleasePolicy.PASSWORD)
+    modes.forEach{entry->ChoiceRow(releaseLabel(entry),mode==entry){mode=entry}}
+    Text(when(mode) {
+        ReleasePolicy.PASSWORD_OR_TIMER -> "The saved password unlocks early, or the timer unlocks automatically."
+        ReleasePolicy.PASSWORD -> "The saved password is required to unlock. There is no automatic expiry."
+        else -> "The timer unlocks automatically. A password cannot end this session early."
+    })
+    if(mode!=ReleasePolicy.PASSWORD) {
+        Row {TextButton(onClick={duration="5"}){Text("5-min test")};TextButton(onClick={duration="1440"}){Text("Day")};TextButton(onClick={duration="10080"}){Text("Week")}}
+        OutlinedTextField(duration,{duration=it},label={Text("Duration in minutes")},singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number))
+        Text("Every Start begins the full duration again. Your last successful choices are remembered.")
+    }
     PreferenceRow("Allow stronger additions while locked",additions){additions=it}
-    Text("${state.policy.blockers.count{it.enabled}} enabled blockers will keep enforcing. Editing/disabling will be locked. Password-only has no automatic expiry; AND still requires the password after its deadline.")
+    Text("${state.policy.blockers.count{it.enabled}} enabled blockers will keep enforcing. Unlocking allows editing; it keeps your password and leaves blockers enabled.")
     Row {Checkbox(acknowledged,{acknowledged=it});Text("I tested my rules and accept the listed browser/OEM coverage limits.",Modifier.padding(top=10.dp).weight(1f))}
     if(!connected) OutlinedButton(onClick=setup){Text("Set up Accessibility")}
-    Button(enabled=connected && acknowledged,onClick={action{val ms=duration.toLongOrNull()?.let{Math.multiplyExact(it,60000)} ?: return@action "Enter a valid duration.";store.start(mode,ms,additions,ServiceStatus.connected.value)}}){Text("Start Restricted Mode")}
+    val needsPassword=mode!=ReleasePolicy.TIMER
+    if(needsPassword && state.password==null) Text("Set a password before starting this mode.",color=MaterialTheme.colorScheme.error)
+    Button(enabled=connected && acknowledged && (!needsPassword || state.password!=null),onClick={action{
+        // Password-only has no deadline and must not parse an inactive duration field.
+        val ms=if(mode==ReleasePolicy.PASSWORD) saved.durationMillis else {
+            val value=duration.toLongOrNull()?.takeIf{it in 1L..525600L} ?: return@action "Choose 1 to 525600 minutes."
+            value*60000L
+        }
+        store.start(mode,ms,additions,ServiceStatus.connected.value)
+    }}){Text("Start Restricted Mode")}
+}
+/** AND is displayed only when reading a session created by an older build. */
+private fun releaseLabel(mode: ReleasePolicy)=when(mode) {
+    ReleasePolicy.PASSWORD -> "Password only"
+    ReleasePolicy.TIMER -> "Timer only"
+    ReleasePolicy.PASSWORD_OR_TIMER -> "Password or timer"
+    ReleasePolicy.PASSWORD_AND_TIMER -> "Password and timer (existing session)"
 }
 /** Optional normal-Android friction; these controls never claim device-owner privileges. */
 @Composable private fun ProtectionControls(state: AppState,action:(suspend()->String?)->Unit) {
     val context=LocalContext.current; val store=Graph.store
     val manager=context.getSystemService(DevicePolicyManager::class.java)
     val component=ComponentName(context,FocusGateAdminReceiver::class.java)
-    Text("Device protections",style=MaterialTheme.typography.titleLarge)
-    Text("Device Admin: ${if(manager.isAdminActive(component)) "active" else "not active"}. Adds ordinary uninstall friction, not a privileged uninstall guarantee.")
+    Text("Device Admin: ${if(manager.isAdminActive(component)) "active" else "not active"}.")
+    Text("Device Admin may add a deactivation step before uninstalling. Android can still interrupt protection.",style=MaterialTheme.typography.bodySmall)
     PreferenceRow("Uninstall resistance",state.settings.uninstallResistance,state.session==null){enabled->action{
-        val error=store.updateSettings(state.settings.copy(uninstallResistance=enabled))
+        val error=store.updateSettings(state.settings.copy(uninstallResistance=enabled),state.settings)
         if(error==null) withContext(Dispatchers.Main) {
             if(enabled) context.startActivity(Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN,component).putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,"Adds an administrator deactivation step before uninstalling FocusGate. No wipe or device-password policies are requested."))
             else if(manager.isAdminActive(component)) manager.removeActiveAdmin(component)
         }
         error
     }}
-    Text("Settings protection")
-    listOf("Off","Sensitive screens (experimental)","Whole Settings").forEachIndexed{index,label->Row(Modifier.fillMaxWidth()){RadioButton(selected=state.settings.settingsMode==index,enabled=state.session==null,onClick={action{store.updateSettings(state.settings.copy(settingsMode=index))}});Text(label,Modifier.padding(top=12.dp))}}
-    PreferenceRow("Wi-Fi/mobile screen exceptions (when recognized)",state.settings.networkExceptions,state.session==null){action{store.updateSettings(state.settings.copy(networkExceptions=it))}}
-    PreferenceRow("Return Home from recognized Recents",state.settings.recents,state.session==null){action{store.updateSettings(state.settings.copy(recents=it))}}
-    Text("Whole Settings can prevent permission repair; release the lock first when no safely scoped repair route is available. Recents and sensitive-screen detection vary by HyperOS version.",style=MaterialTheme.typography.bodySmall)
+    HorizontalDivider()
+    Text("Block access to Android Settings",style=MaterialTheme.typography.titleMedium)
+    listOf("Off","Sensitive settings only (experimental)","All Settings screens").forEachIndexed{index,label->ChoiceRow(label,state.settings.settingsMode==index,state.session==null){action{store.updateSettings(state.settings.copy(settingsMode=index),state.settings)}}}
+    PreferenceRow("Allow recognized Wi-Fi and mobile settings",state.settings.networkExceptions,state.session==null){action{store.updateSettings(state.settings.copy(networkExceptions=it),state.settings)}}
+    HorizontalDivider()
+    PreferenceRow("Return Home when Recents is detected",state.settings.recents,state.session==null){action{store.updateSettings(state.settings.copy(recents=it),state.settings)}}
+    if(state.session!=null) Text("Unlock configuration to change device protections.",style=MaterialTheme.typography.bodySmall)
+    Text("Blocking all Settings can prevent permission repair. Unlock configuration and turn this protection off before repairing grants. Detection of sensitive screens and Recents varies by HyperOS version.",style=MaterialTheme.typography.bodySmall)
 }
 @Composable private fun MatchTester() {
     var host by remember{mutableStateOf("youtube.com")};var url by remember{mutableStateOf("")};var result by remember{mutableStateOf("")};var regex by remember{mutableStateOf(false)}
@@ -237,24 +344,35 @@ private fun minutes(ms: Long)=String.format(java.util.Locale.getDefault(),"%d:%0
     var cap by remember{mutableStateOf(group?.continuousCapMillis!=null)};var capMinutes by remember{mutableStateOf((group?.continuousCapMillis?.div(60000) ?: 15).toString())};var breakMinutes by remember{mutableStateOf((group?.requiredBreakMillis?.div(60000) ?: 5).toString())}
     var picker by remember{mutableStateOf(false)};var error by remember{mutableStateOf("")}
     AlertDialog(onDismissRequest=onDismiss,title={Text(if(existing==null) "Create blocker" else "Edit blocker")},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
-        if(locked) Text("Only stronger additions can be saved; the mutation guard checks this independently of the UI.")
+        if(locked) Text("While locked, only changes that add restrictions can be saved.")
         OutlinedTextField(name,{name=it},label={Text("Name")},enabled=!locked || existing==null)
+        HorizontalDivider()
+        Text("Apps & websites",style=MaterialTheme.typography.titleMedium)
         OutlinedButton(onClick={picker=true}){Text("Choose installed apps")}
-        OutlinedTextField(targets,{targets=it},label={Text("One target per line")},supportingText={Text("app:package.id\nhost:youtube.com (includes subdomains)\nregex:https://example\\.com/.* (full match)")},minLines=3)
+        OutlinedTextField(targets,{targets=it},label={Text("Apps and websites")},supportingText={Text("One per line:\napp:package.id\nhost:youtube.com (includes subdomains)\nregex:https://example\\.com/.* (full match)")},minLines=3)
+        HorizontalDivider()
+        Text("Schedule",style=MaterialTheme.typography.titleMedium)
         OutlinedTextField(days,{days=it},label={Text("Weekdays: Mon=1 … Sun=7")},enabled=!locked || existing==null)
         Row {TextButton(enabled=!locked || existing==null,onClick={days="1,2,3,4,5"}){Text("Weekdays")};TextButton(enabled=!locked || existing==null,onClick={days="6,7"}){Text("Weekend")}}
         OutlinedTextField(windows,{windows=it},label={Text("Active windows; blank = all day")},supportingText={Text("09:00-17:00;22:00-02:00. Outside these windows this rule does nothing.")},enabled=!locked || existing==null)
         OutlinedTextField(start,{start=it},label={Text("Start date YYYY-MM-DD (optional)")},enabled=!locked || existing==null)
         OutlinedTextField(end,{end=it},label={Text("End date exclusive (optional)")},enabled=!locked || existing==null)
-        PreferenceRow("Usage allowance instead of continuous block",quota,!locked || existing==null){quota=it}
+        HorizontalDivider()
+        Text("Blocking rule",style=MaterialTheme.typography.titleMedium)
+        ChoiceRow("Always block during schedule",!quota,!locked || existing==null){quota=false}
+        ChoiceRow("Allow limited usage",quota,!locked || existing==null){quota=true}
+        Text(if(quota) "Allow access during the schedule until the shared time allowance runs out. Outside the schedule, this rule does not restrict access."
+            else "Block the selected apps and websites whenever the schedule is active. Outside the schedule, this rule does not restrict access.",style=MaterialTheme.typography.bodySmall)
         if(quota) {
-            OutlinedTextField(allowance,{allowance=it},label={Text("Shared allowance in minutes")})
+            OutlinedTextField(allowance,{allowance=it},label={Text("Shared allowance in minutes")},singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number))
             Row {QuotaPeriod.entries.forEach{entry->FilterChip(selected=period==entry,onClick={period=entry},enabled=!locked || existing==null,label={Text("Per clock ${entry.name.lowercase()}")})}}
             PreferenceRow("Maximum continuous session",cap){cap=it}
-            if(cap) {OutlinedTextField(capMinutes,{capMinutes=it},label={Text("Maximum session in minutes")});OutlinedTextField(breakMinutes,{breakMinutes=it},label={Text("Uninterrupted break in minutes")})}
+            if(cap) {OutlinedTextField(capMinutes,{capMinutes=it},label={Text("Maximum session in minutes")},singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number));OutlinedTextField(breakMinutes,{breakMinutes=it},label={Text("Uninterrupted break in minutes")},singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number))}
             Text("Allowance is shared across every app/site selected here. Switching targets does not reset it; there is no rollover.",style=MaterialTheme.typography.bodySmall)
         }
-        OutlinedTextField(message,{message=it},label={Text("Block explanation")},enabled=!locked || existing==null)
+        HorizontalDivider()
+        Text("Block message",style=MaterialTheme.typography.titleMedium)
+        OutlinedTextField(message,{message=it},label={Text("Explanation shown when blocked")},enabled=!locked || existing==null)
         if(error.isNotBlank()) Text(error,color=MaterialTheme.colorScheme.error)
     }},confirmButton={TextButton(onClick={runCatching{
         val parsed=targets.lines().filter{it.isNotBlank()}.map{line->val kind=line.substringBefore(':').trim();val value=line.substringAfter(':',"").trim();Target(kind,value,kind=="host")}.distinct()

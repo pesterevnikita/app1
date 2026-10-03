@@ -56,11 +56,16 @@ The **Restricted Mode** tab is intended to show configuration lock state, health
 | Password only | Correct trusted-person password; no automatic release |
 | Timer only | Deadline reached; no password override |
 | Password OR timer | Either correct password or deadline; default design |
-| Password AND timer | Correct password entered at or after the deadline |
 
-A correct early password for AND does not pre-authorize later release. Expiry/release unlocks settings and **leaves enabled blockers running**. To stop a blocker, disable it after release. Early OR release lets you change rules and start a new session; it is not a timed pause with automatic re-enablement.
+New sessions offer the three choices above. Existing persisted legacy **Password AND timer** locks retain their original condition: enter the correct password at or after the deadline. A correct early password does not pre-authorize later release. AND is no longer offered for new sessions.
 
-Set a trusted-person password while unlocked and keep it with that person. There is no locked **forgot password** bypass. Retry delays apply after failed attempts but must not postpone automatic timer release.
+Expiry/release unlocks settings and **leaves enabled blockers running**. To stop a blocker, disable it after release. Early OR release lets you change rules and start a new session; it is not a timed pause with automatic re-enablement. Each start uses a fresh duration measured from that start. The last successfully started mode, duration, and restrictive-additions choice are remembered locally for the next start; a short maintenance timer must not replace those preferences.
+
+### Set, reuse, and change a password
+
+The updated password flow is under implementation; phone verification is pending. While unlocked, the initial setup asks for **New password** and **Repeat password**, then shows whether a password is saved without displaying it. Have a trusted person set and keep it. The saved password remains available after expiry/release and is reused for subsequent password-based locks; you do not need to set it for each session.
+
+To change a saved password while unlocked, enter **Old password**, **New password**, and **Repeat password**. The old password must be correct and the new entries must agree. Incorrect old-password attempts are throttled; knowing that configuration is unlocked does not permit replacing the saved password without it. Password changes are refused while locked. There is no password-reset or **forgot password** bypass. Retry delays must not postpone automatic timer release.
 
 While locked, weakening rules, deleting/disabling blockers, raising budgets, reducing protections, changing release credentials, resetting counters, and importing configurations are prohibited. If restrictive additions were enabled before starting, allowed additions include a new enabled independent blocker, extra targets, and lower allowances. They cannot be undone during the session. Arbitrary schedule/regex edits are not accepted as provably restrictive. Harmless appearance preferences and configuration export remain available.
 
@@ -88,7 +93,9 @@ Donation network/address placeholders are empty until supplied by the maintainer
 
 **Why can I use 30 minutes around an hour boundary?** Each clock hour grants its own 15 minutes. Enable a continuous-session cap if you want a break across that boundary.
 
-**What if I forget the password?** OR and timer-only release at the deadline. Password-only has no timer release. AND still requires the password after the deadline. Import cannot provide an escape or reset an active session.
+**What if I forget the password?** OR and timer-only release at the deadline. Password-only has no timer release. An existing legacy AND lock still requires the password after the deadline. Changing a saved password requires the old password even while unlocked; there is no reset bypass. Import cannot provide an escape or reset an active session.
+
+**Must I enter a new password after each timer ends?** No. The saved password is reused after release and on each subsequent password-based lock. Each new timed lock starts a fresh duration; remembered choices do not reuse an old deadline.
 
 **Why did a website remain accessible?** An unknown URL is deliberately allowed by website rules. Private/embedded browsers and unobservable address bars may lack coverage. Whole-browser app rules provide a separate restriction.
 
@@ -99,3 +106,9 @@ Donation network/address placeholders are empty until supplied by the maintainer
 **What if I force-stop FocusGate or lose Accessibility?** Enforcement can stop. Reopen the app, review health, and repair the grant manually using the supported scoped flow or after release. Battery/autostart changes can help availability but cannot guarantee it.
 
 **Is my browsing sent anywhere?** Runtime networking and browsing-history collection are excluded by design. Known URL text is used transiently for local matching. Confirm the final manifest/privacy checks and phone results before treating the development build as accepted.
+
+## Finding controls
+
+Restricted Mode groups status, password management, the lock session, and device protections into separate sections. More groups protection status, phone setup, display/feedback, backups, help, developer tools, and app/support information. Expand help or developer sections when needed.
+
+In the blocker editor, choose **Always block during schedule** to deny access throughout the selected days/time windows, or **Allow limited usage** to share a time allowance across the selected apps and websites. Both choices respect the same schedule. The limit is shared, not a separate allowance for each selected app.

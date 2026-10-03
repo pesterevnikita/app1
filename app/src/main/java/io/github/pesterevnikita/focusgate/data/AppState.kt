@@ -8,8 +8,10 @@ import java.time.*
 import java.net.IDN
 /** settingsMode: 0=off, 1=sensitive Settings screens, 2=all Settings (subject to network exceptions). */
 data class ProtectionSettings(val settingsMode: Int = 0, val networkExceptions: Boolean = true, val recents: Boolean = false, val uninstallResistance: Boolean = false)
+/** Last chosen lock configuration, never an old absolute deadline or a duplicate password record. */
+data class LockPreferences(val releasePolicy: ReleasePolicy = ReleasePolicy.PASSWORD_OR_TIMER, val durationMillis: Long = 86400000L, val allowRestrictiveAdditions: Boolean = true)
 /** Entire private database document. Configuration export intentionally selects only policy/settings. */
-data class AppState(val policy: PolicySnapshot = PolicySnapshot(), val ledger: LedgerState = LedgerState(), val session: LockedSession? = null, val password: PasswordHash? = null, val failures: Int = 0, val retryAfterUtcMillis: Long = 0, val settings: ProtectionSettings = ProtectionSettings(), val diagnostics: Boolean = false, val countdown: Boolean = false, val popup: Boolean = true)
+data class AppState(val policy: PolicySnapshot = PolicySnapshot(), val ledger: LedgerState = LedgerState(), val session: LockedSession? = null, val password: PasswordHash? = null, val failures: Int = 0, val retryAfterUtcMillis: Long = 0, val settings: ProtectionSettings = ProtectionSettings(), val diagnostics: Boolean = false, val countdown: Boolean = false, val popup: Boolean = true, val lockPreferences: LockPreferences? = null)
 object StateGuard {
     fun canUpdateSettings(state: AppState, settings: ProtectionSettings): Boolean = state.session==null || state.settings==settings
     /** Compare the editor's baseline inside the durable transaction, preventing concurrent partial edits from being lost. */

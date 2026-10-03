@@ -13,7 +13,7 @@ FocusGate is an offline Kotlin/Compose Android app for interrupting procrastinat
 
 Three simple tabs expose Blockers, Restricted Mode, and More. Editable presets block native/web YouTube and Instagram, and offer one shared 15-minute clock-hour budget for Chrome, Edge, Telegram, and Ozon shopping. Rules support schedules, days, date ranges, quotas, and optional maximum continuous sessions with required breaks. Default presets are not hardcoded enforcement.
 
-Enabled rules work while configuration is unlocked. Restricted Mode locks changes, with password, timer, password OR timer, and password AND timer release choices. Provably restrictive additions may be allowed while locked. Release unlocks configuration; automatic temporary pause/relock is deferred. Website rules operate only on confidently recognized browser address bars, with host matching or bounded RE2/J full-match regex. Unknown URLs remain allowed. Denial currently returns Home rather than navigating to GitHub.
+Enabled rules work while configuration is unlocked. Restricted Mode locks changes, with password, timer and password OR timer release choices. AND is retained only to decode and honor existing legacy sessions. Provably restrictive additions may be allowed while locked. Release unlocks configuration; automatic temporary pause/relock is deferred. Website rules operate only on confidently recognized browser address bars, with host matching or bounded RE2/J full-match regex. Unknown URLs remain allowed. Denial currently returns Home rather than navigating to GitHub.
 
 Device Admin, Settings blocking, and Recents protection provide optional normal-action friction. The app cannot promise defense against disabling Accessibility, force-stop, data removal, safe mode, root/ADB, or factory reset. Usage Access is not required by current accounting. Donations contain empty maintainer-editable constants in `donations/DonationConfig.kt`; no payment/network integration exists.
 
@@ -59,7 +59,7 @@ $env:JAVA_HOME = '<JDK_21>'
 
 If a development proxy is required, configure it locally. Do not publish its address or credentials.
 
-The latest full verification passed 57 unit tests, lint with zero errors/five warnings, and assembled both debug APKs. One Room instrumentation test also passed on the Xiaomi. Reports are in `policy/build/test-results/test/`, `app/build/test-results/testDebugUnitTest/`, and `app/build/reports/`.
+The latest full verification passed 65 unit tests, lint with zero errors/five warnings, and assembled debug and unsigned release APKs. The separate instrumentation APK was built and exercised earlier. One Room instrumentation test also passed on the Xiaomi. Reports are in `policy/build/test-results/test/`, `app/build/test-results/testDebugUnitTest/`, and `app/build/reports/`.
 
 ## Device workflow
 
@@ -97,3 +97,9 @@ When changing behavior, update the relevant design/development/testing notes. Ad
 The user approved retaining shell-only ADB maintenance controls in final builds. Read [the API and helper guide](adb-control.md) and [extension plan](superpowers/plans/2026-10-03-adb-maintenance.md). The main-source provider requires caller DUMP permission and UID 2000; every policy write still uses transactional AppStore guards. It provides no password/release/grant/reset endpoint. Do not remove it merely because a build is release.
 
 Current phone configuration restored after cap acceptance: shared quota 15 minutes per clock hour, continuous cap off, break five minutes; both editable presets enabled. Restricted Mode off. Next checks: password-policy release, reboot/screen-off recovery, optional admin and Settings/Recents protections. ADB profile import uses the same importer and must refuse active locks.
+
+Password lifecycle follow-up: the user reported blind replacement and unclear saved status. Initial setup must confirm the new password; replacement must verify current password plus matching new/repeated values while unlocked, with failed attempts persisted. Save only the verifier. Remember the last successfully selected lock mode/duration/additions locally and start fresh deadlines on each lock; maintenance test timers must not overwrite those choices. Existing credentials remain intact on upgrade.
+
+UI follow-up: Restricted Mode separates status/password/session/device protections into cards. More uses setup, display, backups, help, developer tools, and about/support sections; secondary help is collapsed. The blocker editor uses explicit Always block during schedule / Allow limited usage radio choices. Protection edits pass their original settings snapshot to the transaction to reject stale concurrent updates.
+
+Current password/UI follow-up verification: 65 JVM tests pass, lint reports zero errors/five warnings, debug/release assembly passes. Updated app is installed and password-set status plus the change dialog and grouped screens are visually verified. The user is privately testing current-password refusal/replacement; do not control or capture their screen while they type. Then continue short OR release/relock and remaining device acceptance.

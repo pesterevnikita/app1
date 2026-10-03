@@ -10,8 +10,8 @@ import kotlinx.coroutines.sync.withLock
 import io.github.pesterevnikita.focusgate.policy.*
 import io.github.pesterevnikita.focusgate.runtime.AndroidClock
 import io.github.pesterevnikita.focusgate.security.PasswordVerifier
-import io.github.pesterevnikita.focusgate.health.SetupPreflight
-import java.util.UUID
+import io.github.pesterevnikita.focusgate.security.PasswordChanges
+import io.github.pesterevnikita.focusgate.security.PasswordAttempts
 /**
  * Single durable write boundary shared by the UI and enforcement service.
  * Public mutations return null on success or a user-facing refusal/error, rather than partial state.
@@ -57,18 +57,22 @@ class AppStore(private val context: Context, name: String = "focusgate.db") {
     suspend fun saveLedger(ledger: LedgerState, revision: Long): String? = transact { require(it.policy.revision==revision) { "Stale usage observation" }; it.copy(ledger=ledger) }
     /** Optional baseline prevents maintenance requests planned concurrently from replacing one another's protection edits. */
     suspend fun updateSettings(settings: ProtectionSettings, expectedSettings: ProtectionSettings? = null): String? = transact { StateGuard.settingsChange(it,settings,expectedSettings) }
-    /** Store only a salted verifier; consume and clear the caller's character buffer even on failure. */
-    suspend fun setPassword(password: CharArray): String? = try { transact { require(it.session==null) { "Password is locked." }; it.copy(password=PasswordVerifier.create(password),failures=0,retryAfterUtcMillis=0) } } finally { password.fill('\u0000') }
+    /** Persist wrong-current-password throttling as well as successful replacement; never allow blind overwrite. */
+    suspend fun updatePassword(currentPassword: CharArray, newPassword: CharArray, confirmation: CharArray): String? = try {
+        var refused: String?=null
+        val failure=transact { current ->
+            val result=PasswordChanges.apply(current,currentPassword,newPassword,confirmation,clock.now().instant.toEpochMilli())
+            refused=result.error; result.state
+        }
+        failure ?: refused
+    } finally {
+        // Also clear buffers if storage/cancellation fails before the helper is reached.
+        currentPassword.fill('\u0000'); newPassword.fill('\u0000'); confirmation.fill('\u0000')
+    }
     suspend fun preferences(diagnostics: Boolean, countdown: Boolean, popup: Boolean): String? = transact{it.copy(diagnostics=diagnostics,countdown=countdown,popup=popup)}
     /** Lock configuration, not blocker activation. Both deadline clocks are persisted to survive restarts. */
-    suspend fun start(mode: ReleasePolicy, durationMillis: Long, additions: Boolean, accessibilityConnected: Boolean): String? = transact {
-        require(it.session==null) { "Already locked." }
-        val needsPassword=mode!=ReleasePolicy.TIMER
-        val refusal=SetupPreflight.refusal(accessibilityConnected,needsPassword,it.password!=null); require(refusal==null){refusal ?: "Setup incomplete"}
-        require(it.policy.blockers.any{rule->rule.enabled}) { "Enable a blocker before locking." }
-        require(durationMillis in 60000L..31536000000L) { "Choose a duration from one minute to one year." }
-        val now=clock.now(); val timed=mode!=ReleasePolicy.PASSWORD
-        it.copy(session=LockedSession(UUID.randomUUID().toString(),mode,if(timed) now.instant.toEpochMilli()+durationMillis else null,if(timed) now.elapsedMillis+durationMillis else null,now.bootId,now.zoneId,additions))
+    suspend fun start(mode: ReleasePolicy, durationMillis: Long, additions: Boolean, accessibilityConnected: Boolean, rememberPreferences: Boolean = true): String? = transact {
+        LockSessionChanges.start(it,mode,durationMillis,additions,accessibilityConnected,clock.now(),rememberPreferences)
     }
     /**
      * Release only the configuration lock; enabled blockers remain active afterward.
@@ -85,7 +89,7 @@ class AppStore(private val context: Context, name: String = "focusgate.db") {
             val valid=current.password?.let{PasswordVerifier.verify(password,it)}==true
             if(RestrictedSession.canRelease(session.releasePolicy,valid,expired)) current.copy(session=null,failures=0,retryAfterUtcMillis=0)
             else if(valid) { refused="The deadline must also be reached. Enter the password again then."; current.copy(failures=0,retryAfterUtcMillis=0) }
-            else { refused="Incorrect password."; val failures=(current.failures+1).coerceAtMost(20); current.copy(failures=failures,retryAfterUtcMillis=now.instant.toEpochMilli()+minOf(900000,1000L shl minOf(failures,20))) }
+            else { refused="Incorrect password."; PasswordAttempts.failed(current,now.instant.toEpochMilli()) }
         }
         failure ?: refused
     } finally { password.fill('\u0000') }
