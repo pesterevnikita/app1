@@ -10,14 +10,19 @@ data class Target(val kind: String, val value: String, val includeSubdomains: Bo
         fun UrlRegex(pattern: String) = Target("regex", pattern, false)
     }
 }
+/** Local ISO times, e.g. 09:00. An end earlier than the start crosses midnight. */
 data class TimeWindow(val start: String, val end: String)
+/** ISO weekdays (Monday=1); no windows means the whole eligible day. Dates use yyyy-MM-dd. */
 data class Schedule(val days: Set<Int> = (1..7).toSet(), val windows: List<TimeWindow> = emptyList(), val startDate: String? = null, val endDateExclusive: String? = null)
 enum class QuotaPeriod { HOUR, DAY }
+/** Several blockers can reference one budget. A null session cap disables the continuous-session limit. */
 data class QuotaGroup(val id: String, val period: QuotaPeriod, val allowanceMillis: Long, val continuousCapMillis: Long? = null, val requiredBreakMillis: Long = 300000)
+/** Without a quota group, an active matching rule denies immediately. Enabled rules also run while unlocked. */
 data class Blocker(val id: String, val name: String, val enabled: Boolean = true, val targets: List<Target> = emptyList(), val schedule: Schedule = Schedule(), val quotaGroupId: String? = null, val message: String = "Time for something you chose to do.")
 data class PolicySnapshot(val revision: Long = 0, val blockers: List<Blocker> = emptyList(), val groups: List<QuotaGroup> = emptyList())
 data class UsageSnapshot(val consumed: Map<String, Long> = emptyMap(), val sessions: Map<String, ContinuousSession> = emptyMap())
 data class ContinuousSession(val usedMillis: Long = 0, val lastUseEndUtcMillis: Long = 0, val lastUseEndElapsedMillis: Long? = null, val bootId: String? = null) {
+    /** A break must be uninterrupted; wall-clock edits cannot shorten it within the same boot. */
     fun breakRemaining(requiredBreakMillis: Long,clock: ClockSnapshot): Long {
         val elapsed=lastUseEndElapsedMillis
         val absence=if(bootId==clock.bootId && elapsed!=null) clock.elapsedMillis-elapsed else clock.instant.toEpochMilli()-lastUseEndUtcMillis
@@ -25,5 +30,6 @@ data class ContinuousSession(val usedMillis: Long = 0, val lastUseEndUtcMillis: 
     }
 }
 data class Observation(val packageName: String, val visibleUrl: String? = null, val interactive: Boolean = true, val revision: Long = -1)
+/** Wall time serves calendar schedules; elapsed time serves durations; bootId prevents mixing elapsed clocks. */
 data class ClockSnapshot(val instant: Instant, val elapsedMillis: Long, val bootId: String, val zoneId: String)
 data class Decision(val denied: Boolean, val denyingRuleIds: List<String> = emptyList(), val billableGroupIds: Set<String> = emptySet(), val nextTransitionAt: Instant? = null)

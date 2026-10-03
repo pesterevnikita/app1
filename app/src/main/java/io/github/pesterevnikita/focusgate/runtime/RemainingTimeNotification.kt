@@ -5,6 +5,7 @@ import io.github.pesterevnikita.focusgate.MainActivity
 import io.github.pesterevnikita.focusgate.data.AppState
 object RemainingTimeNotification {
     private var lastText=""
+    /** Optional display only: round remaining milliseconds up to minutes and avoid redundant notifications. */
     fun update(context: Context,state: AppState,remaining: Map<String,Long>) {
         val manager=context.getSystemService(NotificationManager::class.java)
         if(!state.countdown) {manager.cancel(10); lastText=""; return}

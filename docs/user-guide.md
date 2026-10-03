@@ -9,12 +9,14 @@ FocusGate adds a pause between an impulse and another hour of scrolling. Choose 
 Build/install instructions are in the [README](../README.md). The development build requires Java 21, a local Android SDK, the Gradle wrapper, and an authorized device. Installation does not grant system permissions.
 
 1. Open FocusGate and read the Accessibility disclosure. Manually enable its Accessibility service in Android Settings. It observes relevant foreground windows and known browser address bars to decide when to return Home. Sideloaded apps may require Android's **Allow restricted settings** action before Accessibility can be enabled; exact menus depend on the installation and OS version.
-2. Review setup health. Accessibility must be connected for enforcement. Notification permission is optional for status/countdowns; Usage Access is optional for diagnostics. Grant only the permissions for features you choose.
-3. On Xiaomi, find FocusGate's battery settings and select the least restrictive background option available, commonly **No restrictions**. Enable its autostart/background autostart option if present. Menu names vary across HyperOS versions; these steps and their effect are not yet phone-verified. An unavailable public status signal must be shown as **Unknown** or **User confirmed**, not automatically healthy.
+2. Review setup health. Accessibility must be connected for enforcement. Notification permission is optional for status/countdowns; Usage Access is not requested by this build. Grant only the permissions for features you choose.
+3. On Xiaomi, use **More → Open Background autostart** and enable FocusGate, then **Open Battery saver → No restrictions**. Background autostart is separate from **Other permissions → Start in background**. Menu names vary across HyperOS versions; buttons fall back to app details when an OEM page is unavailable. A normal app cannot reliably verify these OEM switches, so check them yourself. If Accessibility reports malfunctioning after the service was killed, turn FocusGate off/on in Accessibility once. After setup, remove its Recents card and open a blocked app to test recovery.
 4. If you choose **Uninstall resistance**, activate ordinary Device Admin manually. This may add a deactivation step before uninstall; it does not grant device-owner uninstall blocking. Review Settings and Recents protection separately, including any unavailable capabilities.
 5. Test a blocked native app and a short quota with editable settings. Test browser cases and service recovery before choosing a short Restricted Mode trial. Confirm the trial releases as expected before making a longer commitment.
 
 No system grant can be silently restored after you disable it. Check setup health after reboot or app/OS updates. Enforcement can pause while Android suspends or reconnects the service.
+
+When blockers are enabled, FocusGate promotes its existing Accessibility service to foreground priority with a quiet persistent notification. This does not add a polling loop or wake lock. **More** shows whether background protection is active. If promotion is unavailable, Accessibility can still enforce while connected; reopening the app retries promotion. This improves process priority but cannot override Android force-stop or guarantee that HyperOS never kills a service.
 
 ## Blockers and presets
 

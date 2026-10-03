@@ -5,6 +5,7 @@ import java.util.Locale
 import com.google.re2j.Pattern
 
 object UrlMatcher {
+    /** Parse only a plausible HTTP(S) address; unknown or incomplete browser text stays unblocked. */
     fun normalized(visibleUrl: String?): String? = runCatching {
         val raw = visibleUrl?.trim()?.takeIf { it.isNotEmpty() && it.length <= 8192 } ?: return null
         val uri = URI(if (raw.contains("://")) raw else "https://$raw")
@@ -12,6 +13,7 @@ object UrlMatcher {
         val host = uri.host ?: return null
         URI(uri.scheme.lowercase(Locale.ROOT), null, IDN.toASCII(host).lowercase(Locale.ROOT), uri.port, uri.path.ifEmpty { "/" }, uri.query, null).toASCIIString()
     }.getOrNull()
+    /** Domain suffixes require a dot boundary; regex rules match the entire normalized URL using RE2/J. */
     fun matches(target: Target, visibleUrl: String?): Boolean {
         val url = normalized(visibleUrl) ?: return false
         return runCatching {

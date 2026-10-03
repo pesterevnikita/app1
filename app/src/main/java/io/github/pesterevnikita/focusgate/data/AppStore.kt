@@ -12,11 +12,20 @@ import io.github.pesterevnikita.focusgate.runtime.AndroidClock
 import io.github.pesterevnikita.focusgate.security.PasswordVerifier
 import io.github.pesterevnikita.focusgate.health.SetupPreflight
 import java.util.UUID
+/**
+ * Single durable write boundary shared by the UI and enforcement service.
+ * Public mutations return null on success or a user-facing refusal/error, rather than partial state.
+ */
 class AppStore(private val context: Context, name: String = "focusgate.db") {
     private val database=Room.databaseBuilder(context,FocusGateDatabase::class.java,name).build()
     private val mutex=Mutex(); private val gson=Gson(); private val clock=AndroidClock(context)
     val state = MutableStateFlow(AppState())
     val ready=MutableStateFlow(false)
+    /**
+     * Read the latest database state, check guards, and save all fields in one transaction.
+     * Publish to observers only after commit so the UI cannot advertise an unsaved lock or quota.
+     * The mutex also keeps concurrent coroutine writes from publishing out of order.
+     */
     private suspend fun transact(change: (AppState)->AppState): String? = withContext(Dispatchers.IO) {
         mutex.withLock {
             runCatching {
@@ -34,6 +43,7 @@ class AppStore(private val context: Context, name: String = "focusgate.db") {
             }.exceptionOrNull()?.let{it.message ?: "Could not save configuration"}
         }
     }
+    /** Reconcile timer-only/OR locks on every access; AND locks still require a current password attempt. */
     private fun autoRelease(current: AppState): AppState {
         val session=current.session ?: return current
         val expired=RestrictedSession.expired(session,clock.now(session.zoneId))
@@ -41,11 +51,15 @@ class AppStore(private val context: Context, name: String = "focusgate.db") {
     }
     suspend fun load() { val error=transact{it}; check(error==null) { error ?: "Storage unavailable" } }
     suspend fun refresh(): String? = transact{it}
+    /** Revision checking prevents an old editor from overwriting a newer rule or a stricter addition. */
     suspend fun updatePolicy(policy: PolicySnapshot, expectedRevision: Long): String? = transact{StateGuard.policyChange(it,policy,expectedRevision)}
+    /** Reject usage computed against rules that changed while the service was processing an observation. */
     suspend fun saveLedger(ledger: LedgerState, revision: Long): String? = transact { require(it.policy.revision==revision) { "Stale usage observation" }; it.copy(ledger=ledger) }
     suspend fun updateSettings(settings: ProtectionSettings): String? = transact { require(StateGuard.canUpdateSettings(it,settings)) { "Release Restricted Mode to change protections." }; it.copy(settings=settings) }
+    /** Store only a salted verifier; consume and clear the caller's character buffer even on failure. */
     suspend fun setPassword(password: CharArray): String? = try { transact { require(it.session==null) { "Password is locked." }; it.copy(password=PasswordVerifier.create(password),failures=0,retryAfterUtcMillis=0) } } finally { password.fill('\u0000') }
     suspend fun preferences(diagnostics: Boolean, countdown: Boolean, popup: Boolean): String? = transact{it.copy(diagnostics=diagnostics,countdown=countdown,popup=popup)}
+    /** Lock configuration, not blocker activation. Both deadline clocks are persisted to survive restarts. */
     suspend fun start(mode: ReleasePolicy, durationMillis: Long, additions: Boolean, accessibilityConnected: Boolean): String? = transact {
         require(it.session==null) { "Already locked." }
         val needsPassword=mode!=ReleasePolicy.TIMER
@@ -55,6 +69,10 @@ class AppStore(private val context: Context, name: String = "focusgate.db") {
         val now=clock.now(); val timed=mode!=ReleasePolicy.PASSWORD
         it.copy(session=LockedSession(UUID.randomUUID().toString(),mode,if(timed) now.instant.toEpochMilli()+durationMillis else null,if(timed) now.elapsedMillis+durationMillis else null,now.bootId,now.zoneId,additions))
     }
+    /**
+     * Release only the configuration lock; enabled blockers remain active afterward.
+     * Failed attempts persist an exponentially increasing retry delay, capped at fifteen minutes.
+     */
     suspend fun release(password: CharArray): String? = try {
         var refused: String?=null
         val failure=transact { current ->
@@ -70,6 +88,7 @@ class AppStore(private val context: Context, name: String = "focusgate.db") {
         }
         failure ?: refused
     } finally { password.fill('\u0000') }
+    /** Imports never bring credentials, lock sessions, or usage counters from another installation. */
     suspend fun importConfiguration(json: String, merge: Boolean): String? {
         val document=runCatching{ConfigurationTransfer.parseDocument(json)}.getOrElse{return it.message ?: "Invalid configuration"}
         return transact{require(it.session==null){"Import is unavailable while locked."}; val policy=if(merge) ConfigurationTransfer.merge(it.policy,document.policy) else document.policy; ConfigurationTransfer.validate(policy); it.copy(policy=policy.copy(revision=it.policy.revision+1),settings=if(merge) it.settings else document.settings.copy(settingsMode=0,recents=false,uninstallResistance=false))}

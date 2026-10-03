@@ -1,7 +1,13 @@
 package io.github.pesterevnikita.focusgate.policy
 
 import java.time.ZoneId
+/** Pure decision logic: Android supplies observations; this module never opens or closes apps. */
 object PolicyEngine {
+    /**
+     * Evaluate every matching rule, with any denial winning over an allowance.
+     * Group IDs form a set so overlapping blockers cannot charge the same shared budget twice.
+     * The earliest transition tells the service when to recheck even without another UI event.
+     */
     fun evaluate(policy: PolicySnapshot, usage: UsageSnapshot, observation: Observation, clock: ClockSnapshot): Decision {
         if (!observation.interactive) return Decision(false)
         val zone = ZoneId.of(clock.zoneId)

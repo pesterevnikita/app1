@@ -210,6 +210,8 @@ Keep degraded status local and notify when permitted. With the process/service s
 
 Prefer the system-bound AccessibilityService without an extra always-on foreground service. Add one only if measured phone evidence justifies it; Android 14 type/permission and background-start rules must be satisfied. Do not misuse unrelated service types.
 
+2026-10-03 implementation refinement: measured HyperOS `SwipeUpClean` termination justified foreground promotion of the existing Accessibility service, rather than adding another service or polling watchdog. Use a quiet ongoing notification and Android 14 `specialUse` declaration while enabled blockers or Settings/Recents protections need enforcement. Handle promotion refusal without crashing Accessibility. True Background autostart and No restrictions remain manual OEM setup; foreground priority is not a survival guarantee.
+
 Sources: [PeriodicWorkRequest](https://developer.android.com/reference/androidx/work/PeriodicWorkRequest), [Android 14 foreground service requirements](https://developer.android.com/about/versions/14/changes/fgs-types-required).
 
 ## 9. User interface

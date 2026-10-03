@@ -1,15 +1,25 @@
 package io.github.pesterevnikita.focusgate.policy
 data class LedgerState(val buckets: Map<String, Long> = emptyMap(), val consumed: Map<String, Long> = emptyMap(), val sessions: Map<String, ContinuousSession> = emptyMap())
+/**
+ * In-memory accounting restored from a durable checkpoint. All durations are milliseconds.
+ * Active foreground use is deliberately not restored: process downtime is unobserved, not usage.
+ */
 class UsageLedger(initial: LedgerState = LedgerState()) {
     private val buckets = initial.buckets.toMutableMap()
     private val consumed = initial.consumed.toMutableMap()
     private val sessions = initial.sessions.toMutableMap()
     private var active = emptySet<String>()
     private var previous: ClockSnapshot? = null
+    /** Charge the previous foreground interval before changing which shared groups are active. */
     fun transition(active: Set<String>, groups: List<QuotaGroup>, clock: ClockSnapshot) {
         checkpoint(groups,clock)
         this.active = active
     }
+    /**
+     * Advance accounting using the monotonic clock within one boot; reboot starts a fresh interval.
+     * At a normal hour/day boundary, only usage after that boundary belongs to the new bucket.
+     * Continuous-session usage survives bucket resets and clears only after the required break.
+     */
     fun checkpoint(groups: List<QuotaGroup>, clock: ClockSnapshot) {
         val last = previous
         val delta = if (last != null && last.bootId == clock.bootId) (clock.elapsedMillis-last.elapsedMillis).coerceAtLeast(0) else 0
@@ -30,9 +40,11 @@ class UsageLedger(initial: LedgerState = LedgerState()) {
         }
         previous = clock
     }
+    /** Include usage up to this observation, then give the policy engine immutable copies. */
     fun snapshot(groups: List<QuotaGroup>, clock: ClockSnapshot): UsageSnapshot {
         checkpoint(groups,clock)
         return UsageSnapshot(consumed.toMap(),sessions.toMap())
     }
+    /** Persistence includes counters and break metadata, never an assumed active foreground app. */
     fun state(): LedgerState = LedgerState(buckets.toMap(),consumed.toMap(),sessions.toMap())
 }

@@ -1,5 +1,6 @@
 package io.github.pesterevnikita.focusgate.runtime
 import kotlinx.coroutines.*
+/** Own one future recheck for quota/schedule expiry, replacing obsolete deadlines after new observations. */
 class TransitionScheduler(private val scope: CoroutineScope) {
     private var pending: Job?=null
     fun cancel() { pending?.cancel(); pending=null }

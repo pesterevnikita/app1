@@ -6,6 +6,7 @@ import io.github.pesterevnikita.focusgate.Graph
 import io.github.pesterevnikita.focusgate.accessibility.ServiceStatus
 import io.github.pesterevnikita.focusgate.diagnostics.LocalDiagnostics
 import java.util.concurrent.TimeUnit
+/** Best-effort periodic reconciliation; never the quota timer or a permission-restoring watchdog. */
 class HealthWorker(context: Context,params: WorkerParameters): CoroutineWorker(context,params) {
     override suspend fun doWork(): Result {
         if(!applicationContext.getSystemService(UserManager::class.java).isUserUnlocked) return Result.success()
@@ -14,5 +15,8 @@ class HealthWorker(context: Context,params: WorkerParameters): CoroutineWorker(c
         if(!ServiceStatus.connected.value && Graph.store.state.value.diagnostics) LocalDiagnostics(applicationContext.filesDir).record("HEALTH_DEGRADED",System.currentTimeMillis())
         return Result.success()
     }
-    companion object { fun schedule(context: Context) { WorkManager.getInstance(context).enqueueUniquePeriodicWork("setup-health",ExistingPeriodicWorkPolicy.KEEP,PeriodicWorkRequestBuilder<HealthWorker>(30,TimeUnit.MINUTES).build()) } }
+    companion object {
+        /** Unique work survives app restarts without adding duplicate health checks. */
+        fun schedule(context: Context) { WorkManager.getInstance(context).enqueueUniquePeriodicWork("setup-health",ExistingPeriodicWorkPolicy.KEEP,PeriodicWorkRequestBuilder<HealthWorker>(30,TimeUnit.MINUTES).build()) }
+    }
 }

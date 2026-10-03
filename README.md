@@ -2,7 +2,7 @@
 
 FocusGate is a native Android self-control app designed to redirect selected apps and known matching websites to Home. Rules, shared usage budgets, and configuration stay on the phone.
 
-**Status: 0.1 development APK built; 36 local tests pass. On-phone acceptance is pending.** This README does not certify browser coverage, restart recovery, uninstall resistance, or other features as verified. See [verification results](docs/testing/phone-acceptance.md), the [accepted design](docs/superpowers/specs/2026-10-03-focusgate-design.md), [implementation plan](docs/superpowers/plans/2026-10-03-focusgate.md), and [user guide](docs/user-guide.md).
+**Status: 0.1 development APK installed; 39 unit tests and one on-device Room test pass. Phone acceptance is partial.** Native blocking, initial Chrome/Edge website cases, and swipe-away enforcement were observed on the Xiaomi 11T; full browser/restart/lock coverage remains unverified. See [verification results](docs/testing/phone-acceptance.md), the [accepted design](docs/superpowers/specs/2026-10-03-focusgate-design.md), [implementation plan](docs/superpowers/plans/2026-10-03-focusgate.md), and [user guide](docs/user-guide.md).
 
 The editable presets offer continuous YouTube/Instagram blocking and a combined 15-minute allowance per clock hour for Chrome, Edge, Telegram, and Ozon shopping. An optional continuous-session cap adds a required break. Restricted Mode locks configuration; enabled blockers work even when that mode is off. Password OR timer release is the default design, with password-only, timer-only, and password AND timer choices.
 
@@ -28,3 +28,5 @@ Website rules deny only confidently identified matching URLs in supported Chrome
 Configuration import/export is intended to use local versioned JSON, excluding passwords, active sessions, usage counters, and logs. No accounts, telemetry, VPN, or runtime networking are part of the design. Donation information uses empty maintainer-supplied placeholders; no payment address is provided.
 
 Phone results must be recorded before describing the app as accepted or protections as working on a specific device.
+
+For further development or an agent handoff, start with [AGENTS.md](AGENTS.md) and [development context](docs/development.md). They include architecture, build commands, test practices, and the current device investigation.

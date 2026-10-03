@@ -15,9 +15,12 @@ import kotlinx.coroutines.flow.*
 
 object ServiceStatus {
     val connected=MutableStateFlow(false)
+    val foreground=MutableStateFlow(false)
+    val retryForeground=MutableSharedFlow<Unit>(extraBufferCapacity=1)
     val browser=MutableStateFlow("No browser observation yet; unknown pages are allowed.")
     val remaining=MutableStateFlow<Map<String,Long>>(emptyMap())
 }
+/** Android owns this service's binding; the activity is only a configuration UI. */
 class FocusGateAccessibilityService: AccessibilityService() {
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate)
     private var controller: EnforcementController?=null
@@ -37,7 +40,25 @@ class FocusGateAccessibilityService: AccessibilityService() {
             Graph.store.ready.first{it}
             ServiceStatus.connected.value=true
             diagnostic("SERVICE_CONNECTED")
-            Graph.store.state.collect { state -> if(revision!=state.policy.revision) observe() }
+            Graph.store.state.collect { state ->
+                updateForeground(needsForeground(state))
+                if(revision!=state.policy.revision) observe()
+            }
+        }
+        scope.launch {
+            Graph.store.ready.first { it }
+            ServiceStatus.retryForeground.collect {
+                updateForeground(needsForeground(Graph.store.state.value))
+            }
+        }
+    }
+    /** Promote only while rules need enforcement; this does not start a polling loop. */
+    private fun updateForeground(required: Boolean) {
+        if(required && !ServiceStatus.foreground.value) {
+            ServiceStatus.foreground.value=EnforcementNotification.start(this)
+        } else if(!required && ServiceStatus.foreground.value) {
+            EnforcementNotification.stop(this)
+            ServiceStatus.foreground.value=false
         }
     }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -53,6 +74,7 @@ class FocusGateAccessibilityService: AccessibilityService() {
         if(!Graph.store.ready.value) return
         observations.request()
     }
+    /** One serialized observation: match, redirect, commit usage, then schedule the next transition. */
     private suspend fun inspect() {
         timer.cancel()
         val state=Graph.store.state.value
@@ -104,6 +126,14 @@ class FocusGateAccessibilityService: AccessibilityService() {
         if(delayMillis!=null) timer.schedule(delayMillis) { observe() }
     }
     private fun diagnostic(category: String) { if(Graph.store.ready.value && Graph.store.state.value.diagnostics) Graph.scope.launch { LocalDiagnostics(filesDir).record(category,System.currentTimeMillis()) } }
-    override fun onInterrupt() { ServiceStatus.connected.value=false; timer.cancel() }
-    override fun onDestroy() { ServiceStatus.connected.value=false; runCatching{unregisterReceiver(screenReceiver)}; scope.cancel(); super.onDestroy() }
+    // Android interrupts feedback (such as speech), not the service binding.
+    // We produce no continuous feedback, so keep enforcement and quota timers alive.
+    override fun onInterrupt() {}
+    override fun onDestroy() {
+        ServiceStatus.connected.value=false
+        ServiceStatus.foreground.value=false
+        runCatching{unregisterReceiver(screenReceiver)}
+        scope.cancel()
+        super.onDestroy()
+    }
 }

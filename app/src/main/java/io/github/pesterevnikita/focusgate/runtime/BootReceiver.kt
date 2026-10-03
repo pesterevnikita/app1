@@ -4,6 +4,10 @@ import android.os.UserManager
 import io.github.pesterevnikita.focusgate.Graph
 import io.github.pesterevnikita.focusgate.health.HealthWorker
 import kotlinx.coroutines.launch
+/**
+ * Reload persisted state after reboot/update once credential-protected storage is available.
+ * This schedules health reconciliation; Android itself must reconnect the enabled accessibility service.
+ */
 class BootReceiver: BroadcastReceiver() {
     override fun onReceive(context: Context,intent: Intent) {
         if(intent.action !in setOf(Intent.ACTION_BOOT_COMPLETED,Intent.ACTION_LOCKED_BOOT_COMPLETED,Intent.ACTION_USER_UNLOCKED,Intent.ACTION_MY_PACKAGE_REPLACED)) return

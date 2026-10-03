@@ -6,10 +6,13 @@ import com.google.gson.Gson
 import java.util.UUID
 import java.time.*
 import java.net.IDN
+/** settingsMode: 0=off, 1=sensitive Settings screens, 2=all Settings (subject to network exceptions). */
 data class ProtectionSettings(val settingsMode: Int = 0, val networkExceptions: Boolean = true, val recents: Boolean = false, val uninstallResistance: Boolean = false)
+/** Entire private database document. Configuration export intentionally selects only policy/settings. */
 data class AppState(val policy: PolicySnapshot = PolicySnapshot(), val ledger: LedgerState = LedgerState(), val session: LockedSession? = null, val password: PasswordHash? = null, val failures: Int = 0, val retryAfterUtcMillis: Long = 0, val settings: ProtectionSettings = ProtectionSettings(), val diagnostics: Boolean = false, val countdown: Boolean = false, val popup: Boolean = true)
 object StateGuard {
     fun canUpdateSettings(state: AppState, settings: ProtectionSettings): Boolean = state.session==null || state.settings==settings
+    /** Central guard used regardless of which UI action originated a policy edit. */
     fun policyChange(state: AppState, proposed: PolicySnapshot, expectedRevision: Long): AppState {
         require(state.policy.revision==expectedRevision) { "Configuration changed. Reopen the editor." }
         ConfigurationTransfer.validate(proposed)
@@ -19,6 +22,7 @@ object StateGuard {
     }
 }
 object PresetFactory {
+    /** Ordinary editable starter rules with fresh IDs; nothing in enforcement special-cases these apps. */
     fun create(): PolicySnapshot {
         val group=UUID.randomUUID().toString()
         return PolicySnapshot(blockers=listOf(
@@ -36,7 +40,9 @@ object ConfigurationTransfer {
         while(true) {val count=input.read(buffer);if(count<0)break;require(output.size()+count<=1048576){"File exceeds 1 MB"};output.write(buffer,0,count)}
         return output.toByteArray()
     }
+    /** Portable configuration only: excludes private password verifiers, counters, and active locks. */
     fun export(state: AppState): String = gson.toJson(ConfigurationDocument(policy=state.policy,settings=state.settings))
+    /** Treat imported JSON as untrusted; size, version, and nested rule validation precede saving. */
     fun parseDocument(json: String): ConfigurationDocument {
         require(json.toByteArray(Charsets.UTF_8).size<=1048576) { "Configuration must be at most 1 MB." }
         val document=gson.fromJson(json,ConfigurationDocument::class.java) ?: error("Empty configuration")
@@ -46,6 +52,7 @@ object ConfigurationTransfer {
         return document
     }
     fun parse(json: String): PolicySnapshot = parseDocument(json).policy
+    /** Keep imported/editor data within bounds understood by the policy engine and Android UI. */
     fun validate(policy: PolicySnapshot) {
         require(policy.blockers.size<=500 && policy.groups.size<=500)
         require(policy.blockers.map{it.id}.distinct().size==policy.blockers.size && policy.groups.map{it.id}.distinct().size==policy.groups.size)
@@ -71,6 +78,7 @@ object ConfigurationTransfer {
             } }
         }
     }
+    /** Remap imported IDs together with quota references so a merge cannot collide with existing rules. */
     fun merge(current: PolicySnapshot, imported: PolicySnapshot): PolicySnapshot {
         val groupIds=imported.groups.associate{it.id to UUID.randomUUID().toString()}
         return current.copy(blockers=current.blockers+imported.blockers.map{it.copy(id=UUID.randomUUID().toString(),quotaGroupId=it.quotaGroupId?.let(groupIds::getValue))},groups=current.groups+imported.groups.map{it.copy(id=groupIds.getValue(it.id))})

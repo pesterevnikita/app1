@@ -25,12 +25,14 @@ import io.github.pesterevnikita.focusgate.diagnostics.LocalDiagnostics
 import io.github.pesterevnikita.focusgate.policy.*
 import io.github.pesterevnikita.focusgate.policy.Target
 import io.github.pesterevnikita.focusgate.runtime.AndroidClock
+import io.github.pesterevnikita.focusgate.health.SetupScreens
 import kotlinx.coroutines.*
 import java.time.*
 import java.util.UUID
 
 private fun minutes(ms: Long)=String.format(java.util.Locale.getDefault(),"%d:%02d",ms.coerceAtLeast(0)/60000,(ms.coerceAtLeast(0)/1000)%60)
 
+/** Three configuration tabs. All durable writes still pass through AppStore's guards. */
 @Composable fun FocusGateApp() {
     val context=LocalContext.current
     val store=Graph.store
@@ -118,8 +120,15 @@ private fun minutes(ms: Long)=String.format(java.util.Locale.getDefault(),"%d:%0
                     2 -> Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                         Text("Setup and health",style=MaterialTheme.typography.titleLarge)
                         Text(if(connected) "Accessibility: connected" else "Accessibility: missing/disconnected")
+                        val foreground by ServiceStatus.foreground.collectAsState()
+                        Text(if(foreground) "Background protection: active" else "Background protection: inactive. With enabled blockers, reopen FocusGate to retry.")
                         Button(onClick={disclosure=true}){Text("Accessibility setup")}
-                        Text("Autostart: unknown · Xiaomi battery setup: user must verify. Enable autostart and choose No restrictions in the app's battery settings. Android may still suspend enforcement.")
+                        Text("Xiaomi / HyperOS setup: enable FocusGate in Background autostart, then choose No restrictions in Battery saver. Background autostart is separate from Other permissions → Start in background. These switches cannot be reliably verified by a normal app.")
+                        OutlinedButton(enabled=state.session==null && state.settings.settingsMode==0,onClick={SetupScreens.autostart(context)}){Text("Open Background autostart")}
+                        OutlinedButton(enabled=state.session==null && state.settings.settingsMode==0,onClick={SetupScreens.battery(context)}){Text("Open Battery saver")}
+                        Text("If Accessibility says malfunctioning, turn FocusGate off and on in Accessibility settings. Reopening the app alone may not reconnect it. After setup, remove FocusGate from Recents and test a blocked app again.",style=MaterialTheme.typography.bodySmall)
+                        Text("A persistent service notification helps keep enforcement alive without extra polling. Android or HyperOS can still interrupt it. Notification visibility is optional; granting notifications lets you see the status.",style=MaterialTheme.typography.bodySmall)
+                        if(Build.VERSION.SDK_INT>=33) OutlinedButton(onClick={notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)}){Text("Allow status notifications")}
                         OutlinedButton(enabled=state.session==null && state.settings.settingsMode==0,onClick={context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:${context.packageName}")))}){Text("Open app setup settings")}
                         Text("If Settings protection prevents repair, release the session with its configured password/deadline first. No general repair bypass is offered.",style=MaterialTheme.typography.bodySmall)
                         val browser by ServiceStatus.browser.collectAsState(); Text(browser)
@@ -156,6 +165,7 @@ private fun minutes(ms: Long)=String.format(java.util.Locale.getDefault(),"%d:%0
     OutlinedTextField(value,onValueChange={value=it},label={Text(label)},visualTransformation=PasswordVisualTransformation(),enabled=enabled,modifier=Modifier.fillMaxWidth())
     Button(enabled=enabled && value.isNotEmpty(),onClick={val chars=value.toCharArray();value="";onSubmit(chars)}){Text(button)}
 }
+/** Collect release conditions before starting a lock; the store repeats the safety checks. */
 @Composable private fun LockControls(state: AppState,connected: Boolean,setup:()->Unit,action: (suspend()->String?)->Unit) {
     val store=Graph.store
     var mode by remember{mutableStateOf(ReleasePolicy.PASSWORD_OR_TIMER)}
@@ -173,6 +183,7 @@ private fun minutes(ms: Long)=String.format(java.util.Locale.getDefault(),"%d:%0
     if(!connected) OutlinedButton(onClick=setup){Text("Set up Accessibility")}
     Button(enabled=connected && acknowledged,onClick={action{val ms=duration.toLongOrNull()?.let{Math.multiplyExact(it,60000)} ?: return@action "Enter a valid duration.";store.start(mode,ms,additions,ServiceStatus.connected.value)}}){Text("Start Restricted Mode")}
 }
+/** Optional normal-Android friction; these controls never claim device-owner privileges. */
 @Composable private fun ProtectionControls(state: AppState,action:(suspend()->String?)->Unit) {
     val context=LocalContext.current; val store=Graph.store
     val manager=context.getSystemService(DevicePolicyManager::class.java)
@@ -202,6 +213,7 @@ private fun minutes(ms: Long)=String.format(java.util.Locale.getDefault(),"%d:%0
     OutlinedButton(onClick={result=if(UrlMatcher.matches(if(regex) Target.UrlRegex(host) else Target.Host(host),url)) "Matches" else "Does not match / unidentified URL"}){Text("Test locally")}; if(result.isNotBlank()) Text(result)
 }
 
+/** Build an editable policy proposal. Validation and locked-mode mutation checks occur on save. */
 @Composable private fun BlockerEditor(existing: Blocker?,state: AppState,onDismiss:()->Unit,onSave:(PolicySnapshot)->Unit) {
     val context=LocalContext.current
     val locked=state.session!=null
