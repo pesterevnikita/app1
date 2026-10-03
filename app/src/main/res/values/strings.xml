@@ -1,0 +1,1 @@
+<resources><string name="app_name">FocusGate</string><string name="accessibility_description">FocusGate observes foreground app identities and supported browser address bars to enforce your rules by returning Home. It does not record page content or send data over the network. Disabling Accessibility interrupts enforcement.</string></resources>
