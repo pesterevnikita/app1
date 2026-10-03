@@ -1,6 +1,6 @@
 # FocusGate — Android self-control app specification
 
-Status: design draft for user review. No product implementation is authorized by this document alone.
+Status: design accepted by the user on 2026-10-03 with follow-up corrections incorporated below. Implementation-plan review is the next workflow stage.
 Date: 2026-10-03.
 Repository: https://github.com/pesterevnikita/app1
 
@@ -21,7 +21,7 @@ Confirmed by the user:
 
 Read-only ADB inspection confirmed Android 14 / API 34 and model 21081111RG. The reported HyperOS version comes from the user. No phone settings were changed and no APK was installed during specification work.
 
-Proposed defaults requiring review: the name FocusGate; clock-aligned quota windows; password OR deadline release; fixed timezone during a locked session; restrictive-only additions enabled during Restricted Mode; Android 10+ minimum support with Android 14 as the first acceptance target. These are design choices, not additional confirmed user requirements.
+User follow-up accepted the name FocusGate, clock-aligned quota windows (including 30 consecutive minutes spanning two hours), password OR deadline release, and restrictive-only additions. Website blocking must occur only on confidently identified matching URLs; unknown URLs remain accessible. Presets are ordinary editable/deletable blockers, never mandatory hardcoded enforcement. Optional Device Admin plus sensitive Settings protection should approximate the familiar normal uninstall friction of AppBlocker, subject to phone testing. Android 10+ minimum support and a fixed timezone during a locked session remain implementation defaults.
 
 ## 2. Scope and delivery boundaries
 
@@ -52,7 +52,7 @@ Source: [AccessibilityService API](https://developer.android.com/reference/andro
 
 Normal Device Admin is not equivalent to device owner. The dedicated setUninstallBlocked API is not available to an ordinary consumer app merely because it is an active legacy administrator. An optional active-admin flow may introduce an additional deactivation step on this phone; Settings interception may stop normal attempts to reach it while Accessibility is operating. Both require device verification.
 
-Label the option “Uninstall resistance,” explain the limitation, and display whether Device Admin is active separately from whether Settings protection is available. Do not call privileged uninstall-blocking APIs or request unrelated wipe/password policies.
+Label the option “Uninstall resistance,” explain the limitation, and display whether Device Admin is active separately from whether Settings protection is available. Request ordinary Device Admin when the user enables this option and test long-press launcher uninstall, uninstall from Settings, and administrator deactivation on the Xiaomi. Android may retain/recreate the launcher icon when uninstall is refused; FocusGate must not fake this by reinstalling itself or creating duplicate shortcuts. Do not call privileged uninstall-blocking APIs or request unrelated wipe/password policies.
 
 Source: [DevicePolicyManager.setUninstallBlocked](https://developer.android.com/reference/android/app/admin/DevicePolicyManager#setUninstallBlocked(android.content.ComponentName,%20java.lang.String,%20boolean)).
 
@@ -98,7 +98,9 @@ Show all denying rules in the app; the transient message uses a deterministic pr
 
 Default group: Edge, Chrome, Telegram, Ozon shopping. Combined 15 minutes in each clock hour, such as [10:00, 11:00). No rollover. Show the next reset time.
 
-Support hourly and daily fixed windows plus configurable allowance length. A rolling window is out of first-release scope. UI must say “per clock hour” because 15 minutes before and 15 minutes after a boundary can produce 30 consecutive minutes of access.
+Support hourly and daily fixed windows plus configurable allowance length. A rolling window is out of first-release scope. UI must say “per clock hour” because 15 minutes before and 15 minutes after a boundary can produce 30 consecutive minutes of access unless the optional continuous-session cap is enabled.
+
+The user also requested a maximum continuous session feature. Each quota group can optionally have a maximum accumulated interactive-use duration per session and a required break duration. Proposed editor values are 15 minutes maximum and a five-minute break, configurable and off until selected. Switching within a group preserves the session; an hour/day reset does not reset it. Time away pauses accumulated use, but only one uninterrupted absence from all group targets lasting the required break resets the session. Screen-off/keyguard time counts toward that break. Returning early cancels the partial break. When the cap is exhausted, deny group access until the break completes, even if hourly allowance remains; attempted denied access does not consume usage or interrupt a break because the target was not allowed. Persist session use and last allowed-use end; restore elapsed absence conservatively using available clocks after reboot and document clock limits. Restricted Mode locks cap/break settings: enabling or lowering a cap is restrictive; disabling/raising it or shortening the required break is weakening. No automatic cap is hardcoded into presets.
 
 Count interactive foreground use while screen on and unlocked. Stop at screen-off, keyguard, foreground change, denied activity, or unobservable state. Notification shade and Recents pause counting when detected. If a browser stays foreground, browsing across tabs does not reset the budget. No background audio accounting in version one.
 
@@ -129,7 +131,9 @@ Advanced regex matches a normalized visible URL using explicitly documented full
 
 Ship separate adapters for installed Chrome and Edge. Each result is KnownUrl, UnknownUrl, or NotBrowser. Cache a known URL only while the same page can be tracked; invalidate on navigation uncertainty so a prior safe URL cannot authorize a new unknown page. Never treat text typed into the address bar as a confirmed navigation until supported UI signals establish it.
 
-Per supported browser, offer “When a website cannot be identified: block browser” or “allow with coverage warning.” Proposed default when website rules are active: block on persistent uncertainty after a bounded one-second observation grace. Show this behavior before enabling it; restrict node reads to that grace, cap retries, and do not spin continuously. Time spent in the grace counts against applicable app quotas. Disabled website blockers do not trigger this fallback.
+Unknown URL behavior is fixed to allow with a coverage warning in the first release: deny only a confidently identified URL that matches an enabled website rule. A separate app blocker can still deny the browser by package or exhausted quota. Invalidate stale URLs immediately on navigation uncertainty. Bound adapter retries within a one-second observation grace and never spin continuously. Browser foreground time still counts against applicable app quotas even when its URL is unknown. Provide a local troubleshooting status and URL match tester so the user can improve rules without collecting browsing history.
+
+Blocked website action remains Home redirection. Redirecting to a remote replacement such as https://github.com is deferred because directing the browser to fetch it would violate the intended no-network enforcement behavior. A future offline replacement page could be designed separately; do not automate address-bar editing in this release.
 
 First release must test normal and private tabs, redirects, hidden address bars, app links, browser startup, and switching tabs. If an adapter cannot meet the agreed cases, label it unsupported and offer whole-browser blocking. Embedded browsers, alternate profiles, cloned apps, and unselected browsers do not inherit coverage automatically; list them in preflight guidance.
 
@@ -152,7 +156,7 @@ Release choices:
 
 Offer durations such as one day, one week, and custom duration. Explicitly summarize the consequences before starting, especially no automatic release for Password only and Password AND timer.
 
-Release occurs only when the selected condition is satisfied and returns to editable configuration. For Password AND timer, a correct password before the deadline does not release the session or pre-authorize later release; the password must be entered at or after the deadline. No automatic blocker disabling. Timer-only controls expose no password override. No “forgot password” bypass while locked. Lost-password guidance must explain that the selected release policy still applies; app data removal is outside the protection guarantee.
+Release occurs only when the selected condition is satisfied and returns to editable configuration. For Password AND timer, a correct password before the deadline does not release the session or pre-authorize later release; the password must be entered at or after the deadline. No automatic blocker disabling. With Password OR timer, a trusted person can release early; the user can then disable selected ordinary blockers and start a new locked session anytime. A timed temporary pause with automatic re-enablement is a separate future feature, not an implied first-release password action. Timer-only controls expose no password override. No “forgot password” bypass while locked. Lost-password guidance must explain that the selected release policy still applies; app data removal is outside the protection guarantee.
 
 ### 6.2 Protected mutations
 
@@ -271,7 +275,7 @@ Import while unlocked offers replace or merge with preview. Generate/remap IDs t
 
 Developer diagnostics are off by default. Use a private bounded ring buffer, proposed cap 1 MB, with timestamp, event category, rule ID, reason, state transition, grant status and timing. No credentials or raw node content. Local export is explicit and separate from configuration export. Locked sessions may allow read-only diagnostics but no simulated clock, quota reset, policy reset, or release bypass.
 
-Donation panel is static offline information: optional maintainer-provided cryptocurrency network/address, copy action, and locally rendered QR. No invented address, wallet/network request, balance lookup, embedded checkout, or donation-gated feature. If no verified address has been supplied, hide the payment controls and show only a short future-support note.
+Donation panel is static offline information: optional maintainer-provided cryptocurrency network/address, copy action, and locally rendered QR. Create a clearly commented DonationConfig.kt with DONATION_NETWORK and DONATION_ADDRESS empty placeholder constants that the maintainer can find and replace later. No invented address, wallet/network request, balance lookup, embedded checkout, or donation-gated feature. If no verified address has been supplied, hide the payment controls and show only a short future-support note.
 
 ## 13. Introduction and user help content
 
@@ -295,7 +299,7 @@ FAQ answers must explicitly cover: why blockers still work after lock expiry; sh
 - Each enabled blocker enforces outside Restricted Mode; disabling it while unlocked stops its contribution.
 - Any denying rule wins over an allowing quota; overlapping quotas count an interval once per group.
 - Shared group: seven minutes Chrome + eight minutes Telegram exhausts the allowance for all four packages; Ozon Bank remains outside the preset.
-- Boundary cases: hourly/daily reset, midnight, overnight windows, weekdays, date-range endpoints, timezone changes, DST and backward clock jumps.
+- Boundary cases: hourly/daily reset, midnight, overnight windows, weekdays, date-range endpoints, timezone changes, DST and backward clock jumps. Continuous-session cap persists across group switches/hour boundaries/restarts; short absence does not reset it; a full uninterrupted configured break does.
 - Static foreground content is redirected at quota exhaustion and schedule start without requiring a new UI event.
 - Every release policy has truth-table tests; expiry unlocks configuration but leaves blockers enabled.
 - Locked mutation tests cover UI and repository/domain entry points, imports, counters, protections, password and debug operations.
@@ -309,7 +313,7 @@ FAQ answers must explicitly cover: why blockers still work after lock expiry; sh
 Record Android/HyperOS version, browser versions, navigation mode, grants, battery/autostart setup and observed results. Use a short test session; do not create a week-long unreleasable test lock.
 
 - YouTube/Instagram native apps and supported browser domains return Home; unrelated sites remain accessible when identifiable and otherwise allowed.
-- Chrome/Edge normal/private mode, hidden address bar, navigation, redirects and tab changes meet documented coverage or expose explicit unsupported state.
+- Chrome/Edge normal/private mode, hidden address bar, navigation, redirects and tab changes meet documented coverage or expose explicit unsupported state. Unknown/unidentified URLs are allowed by website rules, stale known URLs are invalidated, and independent app/quota denials still apply.
 - App switching does not multiply quota; screen-off/lock pauses accounting; quota does not reset after service/process restart.
 - Measured engineering target: native app redirection within one second of an observable foreground event; supported known URL redirection within two seconds. Report measured distribution and any failures rather than claiming an Android-wide guarantee.
 - Screen off/on, activity swipe-away, launcher restart, service reconnection, process death, reboot before/after first unlock, and app update preserve locked policy. Measure reconnection gaps separately from persistence.
@@ -321,16 +325,10 @@ Record Android/HyperOS version, browser versions, navigation mode, grants, batte
 
 ### Completion criteria
 
-The first release is usable only when both target scenarios and all core lock/recovery tests pass on the Xiaomi. Settings/Recents/uninstall friction may ship with clear tested capability limits; failures cannot silently weaken website fallback or configuration locking. Deliver an APK, readable source/comments, local user guide, recorded phone results, known limitations, and GitHub history without secrets.
+The first release is usable only when both target scenarios and all core lock/recovery tests pass on the Xiaomi. Settings/Recents/uninstall friction may ship with clear tested capability limits; failures cannot silently change the agreed unknown-URL behavior or weaken configuration locking. Deliver an APK, readable source/comments, local user guide, recorded phone results, known limitations, and GitHub history without secrets.
 
 ## 15. Review decisions
 
-The written spec needs user review before implementation planning. In particular, confirm or amend:
-
-- Clock-hour rather than rolling-hour budget windows.
-- Default password OR timer release, while exposing the other three policies.
-- Unknown browser URL default: deny after the bounded observation grace while website blockers apply.
-- Restrictive-only additions during a locked session.
-- FocusGate name and the proposed release scope.
+The user reviewed and accepted the design with the corrections recorded in section 1. Approved decisions: clock-hour budgets, Password OR timer default, allow unknown URLs, restrictive-only additions, editable presets, ordinary Device Admin/Settings friction, and FocusGate name. The user subsequently requested an optional continuous-session cap; include it in the first release with the proposed configurable defaults in section 4.3. Review the implementation plan before starting product code.
 
 No donation address, signing secret, GitHub token, or private phone identifier belongs in this repository.
