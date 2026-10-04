@@ -1,21 +1,25 @@
 # Password removal and visibility follow-up
 
-User-authorized scope: add eye controls to password inputs; allow removing a saved password by verifying it; explain the effect on Password OR timer. Existing password/change behavior was reported working by the user.
+**TL;DR:** Add an eye control to every password input. Allow authenticated password removal only while unlocked. After removal, Password-only and OR locks cannot start until a new password is set. Timer-only remains an explicit choice. This plan defines intended checks; use [the roadmap](../../roadmap.md) and [phone acceptance](../../testing/phone-acceptance.md) for results.
+
+The user approved eye controls, password removal, and clear OR/timer explanations. The user reported that the earlier password/change flow worked. This report is separate from measured acceptance.
 
 ## Behavior
 
-- Each input starts hidden and has its own show/hide button. Clearing or recreating a field returns it to hidden. Never reveal the stored password.
-- Remove password is available only while configuration is unlocked. It verifies the current credential inside the same transaction as removal and shares the persisted retry throttle. Preserve blockers, usage, protections and remembered lock choices.
-- First setup and setup after removal ask only for a new password and matching confirmation.
-- No saved password means no new Password-only/OR lock. Timer-only stays available through explicit selection, with no early password release. Explain this in the removal dialog, lock setup, and guide. Never convert OR silently or mutate an active lock.
-- No maintenance password, reset or release endpoint.
+- Start each field masked. Give it an independent show/hide button. Mask it again when cleared or recreated. Never reveal the stored password.
+- Allow **Remove password** only while configuration is unlocked. Verify the latest current password in the same transaction as removal. Use the shared persisted retry delay. Preserve blockers, usage, protections, and remembered lock choices.
+- First setup and setup after removal ask only for a new password and matching confirmation. Do not ask for an old password when none exists.
+- Without a saved password, reject new Password-only and Password OR timer locks. Let the user explicitly choose Timer-only. It has no early password override. Explain this before removal, in lock setup, and in the guide. Never silently convert OR or change an active session.
+- Add no maintenance password, reset, or release endpoint.
 
 ## Implementation and verification
 
-1. Backend/tests: add pure removal rules and guarded store action; demonstrate failing removal tests before implementation, then verify correct/wrong/stale password, shared cooldown, all locked modes, data retention, fresh setup and new-lock prerequisites.
-2. UI: shared password field with local vector eyes; removal dialog and status; clear no-password release choices and help text.
-3. Review and run policy/app unit tests, Android lint, debug/release assembly.
-4. Upgrade the connected phone without data removal. Verify service recovery, removal explanation and eye behavior using a disposable input without submitting real credential changes. Actual password entry/removal remains with the user.
-5. Update durable acceptance/development docs and publish through existing Git authentication.
+1. Add pure removal rules and a guarded store action. Show failing tests before implementation. Test correct, wrong, and stale passwords; shared cooldown; refusal in every locked mode; retained data; fresh setup; and new-lock prerequisites.
+2. Add a shared password field with local vector eye icons. Add the removal dialog, password status, and clear no-password choices/help.
+3. Review the changes. Run policy/app unit tests, Android lint, and debug/release builds.
+4. Upgrade without removing phone data. Test service recovery, the removal explanation, and eye behavior with disposable input. Do not submit real credential changes through automation. The user enters and removes their private password.
+5. Update tracked acceptance/development documents. Publish through existing Git authentication.
 
-The backend/test task and read-only code review are delegated; the root agent owns UI/docs, build coordination and phone interaction.
+Original work split: subagents handled backend/tests and read-only review. The root agent handled UI/docs, build coordination, and phone interaction. This describes that implementation, not a standing delegation requirement.
+
+The user later kept removal unavailable during Restricted Mode. Do not implement unlock-and-remove as a new password action. The user must release the session normally before removing the password.

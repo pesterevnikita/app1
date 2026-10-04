@@ -1,120 +1,128 @@
 # FocusGate user guide
 
-**Version 0.1 development: on-phone acceptance pending.** This guide explains the intended app and policies. Controls, browser coverage, persistence, and device protections still need acceptance testing on the primary Xiaomi 11T running Android 14/HyperOS. Do not depend on an untested long lock.
+**TL;DR:** Choose blockers, grant Accessibility, and test them. Blockers enforce while settings are unlocked. Restricted Mode prevents weaker settings until its password or timer release. Start with a short lock. Version 0.1 has partial phone acceptance; read the [roadmap](roadmap.md) and [limits](testing/known-limitations.md).
 
-FocusGate adds a pause between an impulse and another hour of scrolling. Choose your rules, test them, then lock them for a commitment you want to keep. Configuration stays on your phone.
+FocusGate adds a pause before another hour of scrolling. Choose rules that help you leave distracting apps. Test them, then lock them for a commitment you want to keep. Configuration stays on your phone.
 
 ## Install and prepare
 
-Build/install instructions are in the [README](../README.md). The development build requires Java 21, a local Android SDK, the Gradle wrapper, and an authorized device. Installation does not grant system permissions.
+See the [README](../README.md) for build and installation. Installation does not grant system permissions.
 
-1. Open FocusGate and read the Accessibility disclosure. Manually enable its Accessibility service in Android Settings. It observes relevant foreground windows and known browser address bars to decide when to return Home. Sideloaded apps may require Android's **Allow restricted settings** action before Accessibility can be enabled; exact menus depend on the installation and OS version.
-2. Review setup health. Accessibility must be connected for enforcement. Notification permission is optional for status/countdowns; Usage Access is not requested by this build. Grant only the permissions for features you choose.
-3. On Xiaomi, use **More → Open Background autostart** and enable FocusGate, then **Open Battery saver → No restrictions**. Background autostart is separate from **Other permissions → Start in background**. Menu names vary across HyperOS versions; buttons fall back to app details when an OEM page is unavailable. A normal app cannot reliably verify these OEM switches, so check them yourself. If Accessibility reports malfunctioning after the service was killed, turn FocusGate off/on in Accessibility once. After setup, remove its Recents card and open a blocked app to test recovery.
-4. If you choose **Uninstall resistance**, activate ordinary Device Admin manually. This may add a deactivation step before uninstall; it does not grant device-owner uninstall blocking. Review Settings and Recents protection separately, including any unavailable capabilities.
-5. Test a blocked native app and a short quota with editable settings. Test browser cases and service recovery before choosing a short Restricted Mode trial. Confirm the trial releases as expected before making a longer commitment.
+1. Read the Accessibility disclosure. Enable FocusGate manually in Android Accessibility settings. It observes foreground app identities and supported browser address bars, then returns Home when a rule denies access. Android may require **Allow restricted settings** for a sideloaded app. Menu names depend on the OS and installation method.
+2. Check setup health. Accessibility must be connected. Notification permission is optional for status/countdowns. This build does not request Usage Access. Grant permissions only for features you choose.
+3. On Xiaomi, open **More → Open Background autostart** and enable FocusGate. Open **Battery saver → No restrictions**. Background autostart is separate from **Other permissions → Start in background**. Check the switches yourself; FocusGate cannot reliably read them. Setup buttons fall back to app details when needed. If Accessibility says malfunctioning, toggle FocusGate off/on in Accessibility. Remove its Recents card, then test a blocked app.
+4. If you select **Uninstall resistance**, activate Device Admin manually. It may require deactivation before uninstall. It does not provide device-owner uninstall blocking. Test Settings and Recents protections separately.
+5. Test a native blocker, a short quota and browser cases. Then test a short Restricted Mode session. Confirm release and Settings access before starting a longer lock.
 
-No system grant can be silently restored after you disable it. Check setup health after reboot or app/OS updates. Enforcement can pause while Android suspends or reconnects the service.
+Disabled grants cannot be restored silently. Check health after reboot or app/OS updates. Enforcement can pause while Android suspends or reconnects the service.
 
-When blockers are enabled, FocusGate promotes its existing Accessibility service to foreground priority with a quiet persistent notification. This does not add a polling loop or wake lock. **More** shows whether background protection is active. If promotion is unavailable, Accessibility can still enforce while connected; reopening the app retries promotion. This improves process priority but cannot override Android force-stop or guarantee that HyperOS never kills a service.
+When enforcement is needed, the existing Accessibility service uses foreground priority and a quiet persistent notification. This adds no polling loop or wake lock. **More** shows background protection status. If promotion fails, connected Accessibility can still enforce; reopening FocusGate retries promotion. Android force-stop and OS termination remain possible.
 
 ## Blockers and presets
 
-The **Blockers** tab is intended for reviewing, adding, and editing rules and remaining allowance. Presets require confirmation and are ordinary editable/deletable rules while unlocked:
+Use **Blockers** to review, add or edit rules and remaining time. Presets are ordinary editable rules. You can disable or delete them while unlocked.
 
-| Preset | Targets | Intended policy |
+| Preset | Targets | Rule |
 | --- | --- | --- |
-| No YouTube or Instagram | Native YouTube/Instagram apps and their website hosts | Continuous blocking |
+| No YouTube or Instagram | Native apps and website hosts | Always block during schedule |
 | Shared distraction budget | Chrome, Edge, Telegram, Ozon shopping | One combined 15 minutes per clock hour |
 
-Ozon Bank is excluded from the shopping preset. Check actual installed app labels/package IDs; alternate profiles, clones, embedded browsers, and other browsers are not automatically covered. YouTube hosts include `youtube.com`, `youtu.be`, and `youtube-nocookie.com` with subdomains; Instagram includes `instagram.com` with subdomains. Host matching uses domain boundaries, so `notyoutube.com` does not match `youtube.com`.
+Ozon Bank is excluded. Check installed labels and package IDs. Alternate profiles, cloned apps, embedded browsers and other browsers are not automatically covered.
 
-Enabled blockers apply outside Restricted Mode. Applicable rules combine: any denying rule wins, even if another rule has allowance remaining. Schedules can use weekdays, time windows, and date ranges; a quota imposes no restriction outside its applicable schedule. Review the schedule preview before saving. Overnight windows belong to the weekday on which they start.
+YouTube hosts: `youtube.com`, `youtu.be`, `youtube-nocookie.com`, including subdomains. Instagram host: `instagram.com`, including subdomains. Matching respects domain boundaries: `notyoutube.com` does not match `youtube.com`.
 
-### Shared budgets and continuous sessions
+Enabled blockers apply outside Restricted Mode. Any denying applicable rule wins, even if another rule has time left. Schedules use weekdays, time windows and date ranges. Outside its schedule, a rule adds no restriction. Check the schedule before saving. An overnight window belongs to the day when it starts.
 
-Seven minutes in Chrome plus eight in Telegram uses the entire shared 15-minute budget for all four targets. Only interactive foreground use while the screen is on and unlocked counts. Switching apps within a group does not create a new allowance; matching several targets in that group counts elapsed time once. Background playback is not charged. Independent overlapping groups each count applicable use.
+In the editor, choose **Always block during schedule** for full blocking. Choose **Allow limited usage** for a shared allowance. Both use the same schedule; the allowance covers all selected targets together.
 
-The allowance resets at a clock-hour boundary without rollover. Using 15 minutes before 11:00 and another 15 minutes after 11:00 can allow 30 consecutive minutes. Daily fixed windows are also part of the intended policy model. Restricted Mode captures a timezone for the session. Manual clock changes remain a limitation without a trusted external clock.
+### Shared time and continuous sessions
 
-The optional **continuous-session cap** is off until selected. Example values are a 15-minute cap and a five-minute required break. Switching between group apps or crossing an hourly reset preserves session use. Time away pauses use; only one uninterrupted full break away from all group targets resets it. Screen-off/lock time can count as a break. Returning early cancels a partial break; denied attempts do not interrupt a break. A reached cap denies access even when hourly allowance remains.
+Seven minutes in Chrome plus eight in Telegram consumes the shared 15-minute budget for all four targets. Only interactive foreground use with the screen on and unlocked counts. Switching targets does not reset time. Multiple matching targets in one group count elapsed time once. Independent overlapping groups each count their applicable use. Background playback is not charged.
 
-The design checkpoints active usage at most every five seconds. An ordinary process death may lose up to five seconds of unrecorded use; unobserved downtime must not be billed. Recovery and multi-window/PiP behavior require phone testing.
+An hourly allowance resets at the clock-hour boundary. Unused time does not carry over. Fifteen minutes before 11:00 plus fifteen after 11:00 can allow 30 consecutive minutes. Daily clock periods are also supported. Restricted Mode saves its timezone. Manual clock changes remain a limit because the app has no trusted external clock.
 
-### Website coverage
+The optional **Maximum continuous session** is off until selected. For example, set a 15-minute cap and five-minute break. Switching group apps or crossing the hour boundary keeps session use. Time away pauses use. Only one full uninterrupted break away from every group target resets it. Screen-off/lock time can count as a break. Returning early cancels a partial break; denied attempts do not interrupt it. A reached cap blocks even if hourly time remains.
 
-Website rules act only on confidently identified matching URLs from supported Chrome/Edge address-bar nodes. They do not scan page text or network traffic. Unknown, hidden, stale, or unobservable URLs remain accessible under website rules. A separate browser app blocker or exhausted app quota can still return Home, and unknown URLs still count against applicable browser app budgets.
+Usage checkpoints run every five seconds while billing and at transitions. Ordinary process death can lose up to five seconds of unrecorded use. Unobserved downtime must not be charged. Recovery, multi-window and picture-in-picture still need phone tests.
 
-Private tabs, redirects, tab switches, hidden bars, and browser updates need separate coverage checks. Use the local match tester and coverage status when available. A Home redirect may briefly reveal the app/page first; it does not stop background audio, downloads, notifications, or network activity in other apps.
+### Websites
 
-## Restricted Mode and release
+Website rules use confidently recognized URLs from supported Chrome/Edge address bars. They do not scan page text or network traffic. Unknown, hidden, stale or unavailable URLs stay allowed by website rules. Separate browser app rules and quotas still apply; unknown pages count toward applicable browser app budgets.
 
-The **Restricted Mode** tab is intended to show configuration lock state, health, release policy, and remaining time. Preflight reviews rules, permissions, browser/protection limitations, and release prerequisites. Core disconnected Accessibility or missing required credentials must prevent starting a lock. Optional capability gaps require acknowledgement.
+Private tabs, redirects, tab switches, hidden bars and browser updates need separate tests. Use the local match tester and coverage status. Home redirection may briefly reveal the page first. It does not stop background audio, downloads, notifications or another app's network activity.
 
-| Release choice | How configuration becomes editable |
+## Restricted Mode
+
+This tab groups status, password controls, lock choices and device protections. Starting a lock requires connected Accessibility, enabled blockers, any required password, and acknowledgement of coverage limits.
+
+| Release choice | Unlock condition |
 | --- | --- |
-| Password only | Correct trusted-person password; no automatic release |
-| Timer only | Deadline reached; no password override |
-| Password OR timer | Either correct password or deadline; default design |
+| Password only | Correct saved password; no timer |
+| Timer only | Deadline; no password override |
+| Password OR timer | Correct saved password or deadline; default design |
 
-New sessions offer the three choices above. Existing persisted legacy **Password AND timer** locks retain their original condition: enter the correct password at or after the deadline. A correct early password does not pre-authorize later release. AND is no longer offered for new sessions.
+Existing legacy **Password AND timer** sessions keep both conditions. Enter the correct password at or after the deadline. An early password does not authorize later release. New sessions cannot select AND.
 
-Expiry/release unlocks settings and **leaves enabled blockers running**. To stop a blocker, disable it after release. Early OR release lets you change rules and start a new session; it is not a timed pause with automatic re-enablement. Each start uses a fresh duration measured from that start. The last successfully started mode, duration, and restrictive-additions choice are remembered locally for the next start; a short maintenance timer must not replace those preferences.
+Release unlocks configuration and **leaves enabled blockers running**. Disable a blocker after release if you want access. Early OR release lets you edit and start a new session. There is no automatic temporary-pause/relock feature.
 
-### Set, reuse, change, and remove a password
+Each Start begins a fresh duration. The last successful mode, duration and restrictive-additions choice are remembered locally. Short maintenance timers do not replace those choices.
 
-While unlocked, **Set password** asks for **New password** and **Repeat new password**; there is no current-password field when no password is saved. Have a trusted person set and keep it. The saved password remains available after expiry/release and is reused for subsequent password-based locks; you do not need to set it for each session.
+### Password setup, change and removal
 
-To change a saved password while unlocked, choose **Change password** and enter **Current password**, **New password**, and **Repeat new password**. The current password must be correct and the new entries must agree. Incorrect current-password attempts are throttled; knowing that configuration is unlocked does not permit replacing the saved password without it.
+While unlocked, **Set password** asks for **New password** and **Repeat new password**. There is no current-password field when none is saved. Ask a trusted person to set and keep it. Passwords remain saved after release and are reused for later locks.
 
-To remove it, choose **Remove password**, review the explanation, and enter the current password. Blockers, usage counters, and remembered lock choices stay unchanged. The status becomes **No password set**, and later setup asks only for a new password and its confirmation.
+**Change password** requires the correct **Current password**, plus matching **New password** and **Repeat new password**. Wrong current-password attempts trigger a saved retry delay. Unlocked settings do not let you replace the password without knowing it.
 
-Without a saved password, **Password only** and **Password OR timer** cannot start. **Password OR timer does not automatically become Timer only.** You must explicitly choose **Timer only**, which cannot end early with a password, or set a new password to use the password options again. Removing a password cannot affect an active lock: first release Restricted Mode normally. Both changing and removing require the current password even after a timer expires; there is no **forgot password** bypass. Retry delays do not postpone automatic timer release.
+**Remove password** also requires unlocked settings and the correct current password. Rules, usage and remembered lock choices stay unchanged. Status becomes **No password set**. Later setup asks only for new and repeated input.
 
-Every password field has an eye button to show or hide what you are typing. Each field starts hidden; clearing it or reopening the dialog hides it again. This only reveals the current input, never the saved password.
+Without a password, Password only and Password OR timer cannot start. **OR does not silently become Timer only.** Choose Timer only explicitly, or set a password. Timer-only sessions have no early password release. You cannot remove a password during an active lock; release the lock normally first.
 
-While locked, weakening rules, deleting/disabling blockers, raising budgets, reducing protections, changing release credentials, resetting counters, and importing configurations are prohibited. If restrictive additions were enabled before starting, allowed additions include a new enabled independent blocker, extra targets, and lower allowances. They cannot be undone during the session. Arbitrary schedule/regex edits are not accepted as provably restrictive. Harmless appearance preferences and configuration export remain available.
+Change and removal require the current password even after timer expiry. There is no forgotten-password reset. Retry delays do not delay automatic timer release.
 
-## Protection, repair, and uninstall
+Eye buttons show or hide current input. Each field starts hidden. Clearing a field or reopening a dialog hides it again. The saved password is never shown.
 
-Settings protection is optional: off, sensitive screens only, or whole Settings. Sensitive-only coverage depends on reliable device-screen recognition; unknown screens remain accessible. Whole-Settings blocking must be explicitly selected. Wi-Fi/mobile exceptions and scoped permission repair require reliable recognition. If safe repair cannot be constrained, release the session using its configured condition before changing grants.
+### Changes while locked
 
-Recents protection attempts Home redirection when Recents is detected; it does not disable Recents universally. Ordinary Device Admin may make uninstall less convenient, but force-stop, permission revocation, OEM process termination, safe mode, cleared data, uninstall, ADB/root, or factory reset remain outside the self-control guarantee. FocusGate is intended for a willing user, not an adversarial security boundary.
+You cannot disable/delete rules, raise budgets, reduce protections, change credentials, reset counters or import configuration. If stronger additions were allowed at Start, you can add an enabled independent blocker, add targets or lower allowances. You cannot undo those changes until release. Arbitrary schedule/regex edits are not accepted as proven stronger changes. Display preferences and configuration export remain available.
 
-After release, disable selected blockers/protections, turn off Device Admin through Android's administrator settings if active, disable Accessibility if desired, and uninstall normally. If protection obstructs Settings, first turn that protection off while configuration is editable. These paths still require device acceptance testing.
+## Protection and repair
 
-## Offline backup, privacy, and support
+Settings protection has three choices: off, sensitive screens, or all Settings. Sensitive protection needs recognized screen classes and allows unknown screens. All-Settings blocking is broader and can obstruct repair. Wi-Fi/mobile exceptions also need recognition. Release the session normally before changing grants when safe repair cannot be limited.
 
-The **More** tab is intended to contain setup health, FAQ, local diagnostics, import/export, privacy, version, and donation information. Configuration export uses versioned JSON through Android's file picker. Prefer a local folder: selecting a cloud-backed document provider lets that provider use its own network service.
+Recents protection returns Home when Recents is detected. Coverage varies by OS; it does not disable Recents universally. Device Admin adds possible uninstall friction. Force-stop, grant removal, OS termination, safe mode, cleared data, uninstall, ADB/root and factory reset can bypass enforcement. FocusGate supports self-control, not a determined attacker.
 
-Exports include rules/groups/schedules and presentation preferences, excluding passwords/verifiers, active sessions, usage counters, grants, and logs. Import is allowed only while unlocked, with merge/replace preview and validation. It cannot unlock a session, restore OS grants, or transfer usage allowance. Diagnostics are optional, off by default, bounded, and exported separately; raw URLs, page/message content, passwords, and browsing history must not be recorded.
+To uninstall after release, disable chosen blockers/protections, deactivate Device Admin in Android if active, and disable Accessibility if wanted. Then uninstall normally. Turn off Settings protection first if it blocks the route. These routes still need phone acceptance.
 
-The runtime design has no Internet/network-state permissions, accounts, ads, telemetry, VPN, or cloud sync. Build tools can download dependencies. Other apps' network behavior is outside FocusGate's control.
+## Backup, privacy and support
 
-Donation network/address placeholders are empty until supplied by the maintainer. Payment/copy/QR controls should remain hidden while no verified address exists. No address is invented and no feature is donation-gated.
+**More** groups health, phone setup, display/feedback, backups, FAQ, developer tools and support. Expand secondary help when needed.
+
+Export writes versioned JSON through Android's file picker. Choose a local folder; a cloud-backed file provider may use its own network. Exports include rules, groups, schedules and display preferences. They exclude passwords/verifiers, active sessions, usage, grants and logs.
+
+Import is unlocked-only, with merge/replace preview and validation. It cannot unlock a session, restore grants or transfer usage time. Diagnostics are optional, off by default, bounded and exported separately. They do not record raw URLs, page content, messages, passwords or browsing history.
+
+FocusGate has no Internet/network-state permissions, accounts, ads, telemetry, VPN or cloud sync. Build tools may download dependencies. Other apps control their own network activity.
+
+Donation network/address placeholders are empty until the maintainer supplies verified details. Copy/payment/QR controls stay hidden without an address. QR rendering is deferred. No payment address is invented; no feature requires a donation.
+
+**More → About & support** shows the [GitHub repository](https://github.com/pesterevnikita/app1) and **Copy repository link**. Telegram feedback says **coming soon** until the maintainer sets a verified public link in `support/SupportConfig.kt`. A configured link gets a copy button. Copying is local. Paste into another app yourself to visit; it may use its own network and account. FocusGate sends no feedback automatically.
 
 ## FAQ
 
-**Why is an app still blocked after my timer ends?** The timer releases the configuration lock. Disable the ordinary blocker after release if you want access.
+**Why is an app still blocked after expiry?** Expiry unlocks settings. Disable its blocker if you want access.
 
-**Why can I use 30 minutes around an hour boundary?** Each clock hour grants its own 15 minutes. Enable a continuous-session cap if you want a break across that boundary.
+**Why can I use 30 minutes around an hour boundary?** Each hour has a fresh allowance. Set a continuous cap if you want a break across that boundary.
 
-**What if I forget the password?** OR and timer-only release at the deadline. Password-only has no timer release. An existing legacy AND lock still requires the password after the deadline. Changing or removing a saved password requires the current password even while unlocked; there is no forgotten-password reset. Import cannot provide an escape or reset an active session.
+**What if I forget the password?** OR and Timer only release at the deadline. Password only has no timer. Legacy AND still needs the password after the deadline. Change/removal require the current password. Import cannot reset a lock.
 
-**Must I enter a new password after each timer ends?** No. The saved password is reused after release and on each subsequent password-based lock. Each new timed lock starts a fresh duration; remembered choices do not reuse an old deadline.
+**Do I set a password for each lock?** No. It stays saved. Each timed Start creates a new deadline.
 
-**Why did a website remain accessible?** An unknown URL is deliberately allowed by website rules. Private/embedded browsers and unobservable address bars may lack coverage. Whole-browser app rules provide a separate restriction.
+**Why was a website allowed?** Its URL may be unknown or unavailable. Website rules allow unknown URLs. A browser app rule can add a broader restriction.
 
-**Why is YouTube audio still playing?** Home redirection does not terminate another app or stop background playback.
+**Why does background audio continue?** Home redirection does not terminate the other app or stop its audio.
 
-**Does Device Admin prevent uninstall?** Ordinary administrator activation may add a deactivation step; it is not a guaranteed uninstall block. OEM Settings protection must be tested independently.
+**Does Device Admin prevent uninstall?** It may add deactivation before uninstall. It is not a guaranteed uninstall block.
 
-**What if I force-stop FocusGate or lose Accessibility?** Enforcement can stop. Reopen the app, review health, and repair the grant manually using the supported scoped flow or after release. Battery/autostart changes can help availability but cannot guarantee it.
+**What if Accessibility stops?** Reopen FocusGate, check health and repair the grant manually. Release first if Settings protection obstructs repair. Autostart/battery setup helps availability but cannot guarantee it.
 
-**Is my browsing sent anywhere?** Runtime networking and browsing-history collection are excluded by design. Known URL text is used transiently for local matching. Confirm the final manifest/privacy checks and phone results before treating the development build as accepted.
-
-## Finding controls
-
-Restricted Mode groups status, password management, the lock session, and device protections into separate sections. More groups protection status, phone setup, display/feedback, backups, help, developer tools, and app/support information. Expand help or developer sections when needed.
-
-In the blocker editor, choose **Always block during schedule** to deny access throughout the selected days/time windows, or **Allow limited usage** to share a time allowance across the selected apps and websites. Both choices respect the same schedule. The limit is shared, not a separate allowance for each selected app.
+**Is browsing sent anywhere?** FocusGate has no runtime networking or browsing-history collection. Known URL text is used briefly for local matching. Read current manifest checks and phone evidence before treating the development build as accepted.

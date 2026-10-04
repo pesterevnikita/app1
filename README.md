@@ -1,14 +1,28 @@
 # FocusGate
 
-FocusGate is a native Android self-control app designed to redirect selected apps and known matching websites to Home. Rules, shared usage budgets, and configuration stay on the phone.
+**TL;DR:** Offline Android app that returns blocked apps and known matching websites to Home. Rules enforce even when settings are unlocked. Development APK installed; 69 unit tests pass. Phone acceptance is partial. Start with the [roadmap](docs/roadmap.md).
 
-**Status: 0.1 development APK installed; 65 unit tests and one on-device Room test pass. Phone acceptance is partial.** Native blocking, initial Chrome/Edge website cases, and swipe-away enforcement were observed on the Xiaomi 11T; full browser/restart/lock coverage remains unverified. See [verification results](docs/testing/phone-acceptance.md), the [accepted design](docs/superpowers/specs/2026-10-03-focusgate-design.md), [implementation plan](docs/superpowers/plans/2026-10-03-focusgate.md), and [user guide](docs/user-guide.md).
+FocusGate helps you step away from distracting apps. Rules, shared budgets, passwords and usage stay on the phone. It is a self-control tool for normal Android actions. It is not a device-owner security product.
 
-The editable presets offer continuous YouTube/Instagram blocking and a combined 15-minute allowance per clock hour for Chrome, Edge, Telegram, and Ozon shopping. An optional continuous-session cap adds a required break. Restricted Mode locks configuration; enabled blockers work even when that mode is off. Password OR timer release is the default design, with password-only and timer-only alternatives. The saved password is reused across locks; changing it requires the current password and confirmation of the new one.
+## Current status
+
+Version 0.1 is a development build. Native YouTube/Instagram blocking, initial Chrome/Edge website cases and repeated swipe-away enforcement were observed on the Xiaomi 11T. An earlier Room test passed on the phone. Wider browser, restart and lock coverage still needs testing.
+
+See the [phone results](docs/testing/phone-acceptance.md), [known limits](docs/testing/known-limitations.md), [accepted design](docs/superpowers/specs/2026-10-03-focusgate-design.md), [original plan](docs/superpowers/plans/2026-10-03-focusgate.md) and [user guide](docs/user-guide.md). The roadmap tracks current work; the original plan records implementation intentions.
+
+## Features
+
+- Editable presets block YouTube/Instagram apps and websites, or share 15 minutes per clock hour across Chrome, Edge, Telegram and Ozon shopping.
+- Optional continuous-session limits require a break, including across hourly resets.
+- Enabled blockers enforce outside Restricted Mode. Restricted Mode locks configuration against weakening changes.
+- Release choices: Password only, Timer only, Password OR timer. Password OR timer is the default design.
+- Passwords stay saved across release and new locks. Change or removal requires the current password while unlocked. Setup requires matching new entries. Eye buttons reveal only current input.
+- Local JSON import/export excludes passwords, active sessions, usage counters and logs.
+- The guarded [ADB maintenance interface](docs/adb-control.md) supports local development in every build variant.
 
 ## Build and install
 
-Use Java 21 and a local Android SDK with platform 36 and compatible build tools. Android 10/API 29 is the minimum target. Set `JAVA_HOME` to your Java 21 installation and create an untracked `local.properties` with your SDK location, for example `sdk.dir=C:/Android/Sdk`. Do not commit machine-specific paths or signing keys.
+Use Java 21 and an Android SDK with platform 36 and compatible build tools. Minimum Android version: Android 10/API 29. Set `JAVA_HOME` to Java 21. Create an untracked `local.properties` with your SDK location. Keep local paths and signing keys out of Git.
 
 From PowerShell in the repository:
 
@@ -17,18 +31,20 @@ From PowerShell in the repository:
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The checked-in Gradle wrapper verifies its official distribution checksum. Dependencies may require downloads during development; runtime execution is offline. On a corporate connection, pass local proxy host/port JVM options to Gradle; do not commit proxy credentials. If downloading Maven AAPT2 times out, an installed compatible SDK copy can be selected with `-Pandroid.aapt2FromMavenOverride=<SDK>/build-tools/<version>/aapt2.exe`. Installation requires an authorized connected device and Android SDK platform tools on `PATH`. Xiaomi may require **Install via USB** and an installation prompt confirmation. Grant Accessibility manually after reading its disclosure. A debug build is for development, not a signed production release.
+The Gradle wrapper checks the official distribution checksum. Build tools may download dependencies; the installed app stays offline. If Maven AAPT2 cannot download, use an installed compatible SDK copy with `-Pandroid.aapt2FromMavenOverride=<SDK>/build-tools/<version>/aapt2.exe`.
+
+Connect an authorized device and put Android platform tools on `PATH`. Xiaomi may require **Install via USB** and a manual install confirmation. Read the Accessibility disclosure, then grant Accessibility manually. A debug APK is not a signed production release.
 
 ## Use and limits
 
-Review targets, test a short quota while settings are editable, then test a short Restricted Mode session and its release. Xiaomi battery/autostart setup and optional ordinary Device Admin need manual review; instructions and caveats are in the [user guide](docs/user-guide.md).
+Review targets and test a short quota while settings are editable. Then test a short Restricted Mode session and its release. Xiaomi autostart, battery settings and optional Device Admin require manual setup. Read the user guide before starting a long lock.
 
-Website rules deny only confidently identified matching URLs in supported Chrome/Edge address bars. Unknown URLs remain accessible unless an independent app rule or exhausted budget denies the browser. This is UI redirection, not a network firewall: background audio, downloads, and notifications may continue. Android permission loss, force-stop, OEM suspension, data removal, and physical-device bypasses can defeat enforcement.
+Website rules need a confidently identified URL from a supported Chrome/Edge address bar. Unknown URLs stay accessible unless another app rule or exhausted browser budget denies access. Home redirection may leave background audio, downloads or notifications running.
 
-Configuration import/export is intended to use local versioned JSON, excluding passwords, active sessions, usage counters, and logs. No accounts, telemetry, VPN, or runtime networking are part of the design. Donation information uses empty maintainer-supplied placeholders; no payment address is provided.
+Permission loss, force-stop, OS suspension, data removal and physical-device bypasses can stop enforcement. Ordinary Device Admin adds uninstall friction; it does not provide device-owner uninstall prevention. Record phone evidence before claiming a protection works on that device.
 
-Phone results must be recorded before describing the app as accepted or protections as working on a specific device.
+No accounts, telemetry, VPN or runtime networking are used. Donation details and Telegram feedback remain empty maintainer placeholders. **More → About & support** shows the repository and copy-only support links. Other apps may use their own network if you paste a link there.
 
-For further development or an agent handoff, start with [AGENTS.md](AGENTS.md) and [development context](docs/development.md). They include architecture, build commands, test practices, and the current device investigation.
+## Continue development
 
-Local command-based development is supported in all build variants through the guarded [ADB maintenance interface](docs/adb-control.md). It remains offline and respects Restricted Mode.
+Read [AGENTS.md](AGENTS.md), [development context](docs/development.md) and the roadmap. They explain architecture, build checks and pending device tests. Keep current work in the roadmap and testing records.

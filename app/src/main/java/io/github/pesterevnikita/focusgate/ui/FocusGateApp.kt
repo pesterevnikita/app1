@@ -31,6 +31,7 @@ import io.github.pesterevnikita.focusgate.policy.Target
 import io.github.pesterevnikita.focusgate.runtime.AndroidClock
 import io.github.pesterevnikita.focusgate.runtime.QuotaPresentation
 import io.github.pesterevnikita.focusgate.health.SetupScreens
+import io.github.pesterevnikita.focusgate.support.SupportConfig
 import kotlinx.coroutines.*
 import java.time.*
 import java.util.UUID
@@ -202,6 +203,18 @@ private fun minutes(ms: Long)=String.format(java.util.Locale.getDefault(),"%d:%0
                         SettingsSection("About & support") {
                             Text("Choose rules that help you step away from distracting apps, then lock them for a commitment you want to keep.")
                             Text("0.1.0 development · phone acceptance in progress",style=MaterialTheme.typography.bodySmall)
+                            HorizontalDivider()
+                            Text("Project on GitHub",style=MaterialTheme.typography.titleMedium)
+                            Text(SupportConfig.REPOSITORY_URL)
+                            OutlinedButton(onClick={copySupportLink(context,"FocusGate repository",SupportConfig.REPOSITORY_URL);notice="Repository link copied."}){Text("Copy repository link")}
+                            if(SupportConfig.TELEGRAM_FEEDBACK_URL.isBlank()) Text("Telegram feedback: coming soon.")
+                            else {
+                                Text("Telegram feedback",style=MaterialTheme.typography.titleMedium)
+                                Text(SupportConfig.TELEGRAM_FEEDBACK_URL)
+                                OutlinedButton(onClick={copySupportLink(context,"FocusGate feedback",SupportConfig.TELEGRAM_FEEDBACK_URL);notice="Feedback link copied."}){Text("Copy feedback link")}
+                            }
+                            Text("Copy a link and paste it into another app to visit. FocusGate stays offline; that app may use its own network and account.",style=MaterialTheme.typography.bodySmall)
+                            HorizontalDivider()
                             if(DonationConfig.DONATION_ADDRESS.isBlank()) Text("Donation details may be added in a future release. No payments or network requests are made.")
                             else {Text(DonationConfig.DONATION_NETWORK); Text(DonationConfig.DONATION_ADDRESS); OutlinedButton(onClick={context.getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Donation address",DonationConfig.DONATION_ADDRESS))}){Text("Copy address")}}
                         }
@@ -213,6 +226,12 @@ private fun minutes(ms: Long)=String.format(java.util.Locale.getDefault(),"%d:%0
     if(disclosure) AlertDialog(onDismissRequest={disclosure=false},title={Text("Accessibility disclosure")},text={Text("FocusGate observes foreground app identities and supported browser address bars, then returns Home when your rules deny access. It does not collect page bodies, messages, screenshots or browsing history, and has no network permissions. Disabling this grant interrupts enforcement. Enable it yourself in the next system screen.")},confirmButton={TextButton(onClick={disclosure=false;context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))}){Text("Continue to Android settings")}},dismissButton={TextButton(onClick={disclosure=false}){Text("Cancel")}})
     if(showEditor) BlockerEditor(editor,state,onDismiss={showEditor=false},onSave={policy->scope.launch{val error=withContext(Dispatchers.IO){store.updatePolicy(policy,state.policy.revision)}; if(error==null) {showEditor=false;notice="Saved."} else notice=error}})
     importText?.let {text-> val preview=ConfigurationTransfer.parseDocument(text); AlertDialog(onDismissRequest={importText=null},title={Text("Import preview")},text={Text("${preview.policy.blockers.size} blockers, ${preview.policy.groups.size} quota groups. No password, active session, counters or grants will be imported. Protection settings require fresh review. Choose merge or replace.")},confirmButton={TextButton(onClick={action{store.importConfiguration(text,true)};importText=null}){Text("Merge")}},dismissButton={Row{TextButton(onClick={action{store.importConfiguration(text,false)};importText=null}){Text("Replace")};TextButton(onClick={importText=null}){Text("Cancel")}}}) }
+}
+
+/** Copy only the public destination; never read the clipboard or open an external app automatically. */
+private fun copySupportLink(context: Context,label: String,url: String) {
+    context.getSystemService(android.content.ClipboardManager::class.java)
+        .setPrimaryClip(ClipData.newPlainText(label,url))
 }
 
 /** Group related controls without coupling their visibility to policy or persistence. */

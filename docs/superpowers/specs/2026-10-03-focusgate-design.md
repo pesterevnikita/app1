@@ -1,342 +1,388 @@
-# FocusGate — Android self-control app specification
+# FocusGate: Android self-control app specification
 
-Status: design accepted by the user on 2026-10-03 with follow-up corrections incorporated below. Implementation-plan review is the next workflow stage.
+**TL;DR:** FocusGate blocks selected apps and known websites on the phone. Enabled blockers work outside Restricted Mode when their schedules apply. Restricted Mode prevents weaker settings. The app stays offline. Presets are editable. This document defines requirements. Read [the roadmap](../../roadmap.md) and [phone acceptance](../../testing/phone-acceptance.md) for current status.
+
+Status: the user accepted the design on 2026-10-03. Later corrections are included here. The user has approved development; do not repeat the original approval step.
 Date: 2026-10-03.
 Repository: https://github.com/pesterevnikita/app1
 
-## 1. Purpose and confirmed brief
+## 1. Purpose and confirmed requirements
 
-FocusGate helps a willing user stop procrastinating in selected apps and websites. When a rule blocks the current activity, the app sends the user to the launcher and optionally explains why. It is a self-control enforcement tool, not a security product against a determined attacker with physical access, ADB, root, bootloader, or factory-reset capabilities.
+FocusGate helps a willing user stop procrastinating in selected apps and websites. A blocked activity returns to the launcher. The app can show a short reason. The threat model is normal Android actions by a user who wants to procrastinate. It excludes determined attackers with physical access, ADB, root, bootloader access, or factory-reset capability.
 
-Confirmed by the user:
+The user confirmed these requirements:
 
-- Use a normal Android application, without device-owner provisioning.
-- No VPN and no network activity by the application. All enforcement, configuration, and diagnostics are local.
-- Enabled blockers enforce their rules even outside Restricted Mode.
-- Restricted Mode locks configuration against weakening; it is not the switch that activates blockers.
-- YouTube and Instagram should be blocked continuously, both native apps and websites.
-- Edge, Chrome, Telegram, and Ozon shopping share one combined 15-minute allowance per hour.
-- Primary device: Xiaomi 11T, HyperOS 1.0.15.0, Android 14.
-- Simple UI, bottom navigation, permission guidance, FAQ, import/export, optional local diagnostics, and future offline donation information.
+- Use a normal Android app without device-owner setup.
+- Use no VPN or app network activity. Keep enforcement, settings, and diagnostics local.
+- Enforce enabled blockers even outside Restricted Mode.
+- Use Restricted Mode to prevent weaker settings. It does not activate blockers.
+- Offer an editable preset that always blocks native and web YouTube and Instagram.
+- Offer one combined 15-minute allowance per clock hour for Edge, Chrome, Telegram, and Ozon shopping.
+- Target Xiaomi 11T first: HyperOS 1.0.15.0 and Android 14.
+- Provide a simple UI, bottom tabs, setup help, FAQ, import/export, optional local diagnostics, and future offline donation information.
 
-Read-only ADB inspection confirmed Android 14 / API 34 and model 21081111RG. The reported HyperOS version comes from the user. No phone settings were changed and no APK was installed during specification work.
+Read-only ADB inspection during design confirmed Android 14 / API 34 and model 21081111RG. The user supplied the HyperOS version. Design work did not change phone settings or install an APK.
 
-User follow-up accepted the name FocusGate, clock-aligned quota windows (including 30 consecutive minutes spanning two hours), password OR deadline release, and restrictive-only additions. Website blocking must occur only on confidently identified matching URLs; unknown URLs remain accessible. Presets are ordinary editable/deletable blockers, never mandatory hardcoded enforcement. Optional Device Admin plus sensitive Settings protection should approximate the familiar normal uninstall friction of AppBlocker, subject to phone testing. Android 10+ minimum support and a fixed timezone during a locked session remain implementation defaults.
+The user accepted the FocusGate name, clock-hour windows, Password OR timer release, and additions that only strengthen restrictions. Clock-hour windows can allow 30 consecutive minutes across two hours. Website rules deny only confidently identified matching URLs. Unknown URLs remain allowed. Presets are editable and deletable; they are never a hardcoded blacklist.
 
-## 2. Scope and delivery boundaries
+Optional Device Admin and sensitive Settings protection should provide normal uninstall friction similar to AppBlocker. Phone tests must establish the actual limits. Initial defaults are Android 10+ support and a fixed timezone during a locked session.
 
-The first usable release must deliver both user scenarios, configuration locking, permission preflight, local persistence, usage accounting, remaining-time display, import/export, and tested lifecycle recovery on the primary phone. Device-specific protections are included only with accurate capability reporting.
+## 2. Scope and delivery
 
-Implementation should be divided into reviewable increments:
+The first usable release must support both target scenarios. It must include configuration locking, setup checks, local storage, usage accounting, remaining-time display, import/export, and tested lifecycle recovery on the primary phone. Report device-specific protections accurately.
 
-1. Pure policy engine, persistence, app blockers, basic UI, and local unit tests.
-2. Chrome/Edge website adapters, shared budgets, notifications, and quota boundary tests.
-3. Restricted Mode, password handling, permission preflight, restart recovery, and clock handling.
-4. Xiaomi Settings/Recents protection experiments, optional Device Admin friction, health diagnostics, documentation, import/export, and phone acceptance tests.
+Use reviewable delivery steps:
 
-These are delivery slices, not a substitute for the later implementation plan. Keep Settings/Recents heuristics isolated from the core policy engine.
+1. Pure policy engine, storage, app blockers, basic UI, and unit tests.
+2. Chrome/Edge website adapters, shared budgets, notifications, and quota-boundary tests.
+3. Restricted Mode, passwords, setup checks, restart recovery, and clocks.
+4. Xiaomi Settings/Recents experiments, optional Device Admin, health diagnostics, documentation, import/export, and phone tests.
 
-Excluded: VPN, network inspection, remote administration, cloud sync, accounts, analytics, ads, root, device-owner enrollment, background screenshots, content recording, and copying/decompiling the dumped commercial APK. Build independently from public APIs and observed phone behavior.
+Keep Settings/Recents detection separate from core policy. These are delivery steps, not a replacement for the implementation plan.
 
-## 3. Platform capabilities and honest limits
+Exclude VPN, network inspection, remote administration, cloud sync, accounts, analytics, ads, root, device-owner enrollment, background screenshots, and content recording. Do not copy or decompile the dumped commercial APK. Build from public APIs and observed phone behavior.
+
+## 3. Android capabilities and limits
 
 ### 3.1 Enforcement
 
-An enabled AccessibilityService receives relevant window events, identifies the foreground package, and uses GLOBAL_ACTION_HOME when a policy denies access. This redirects the UI; it does not terminate another process or prevent its background playback, downloads, notifications, or background network use. A short glimpse before redirection is possible.
+An enabled `AccessibilityService` receives relevant window events and identifies the foreground package. On denial, it calls `GLOBAL_ACTION_HOME`. This changes the foreground UI. It does not terminate the other process or stop background playback, downloads, notifications, or network activity. The user may briefly see the blocked activity.
 
-Browser adapters inspect only known address-bar nodes in supported browser packages. They cannot guarantee visibility into every web page, private mode, hidden address bar, embedded WebView, or future browser version. They must never infer a URL from arbitrary page body text. Website filtering is UI observation, not a network firewall.
+Browser adapters inspect known address-bar nodes in supported packages. Coverage can fail for private tabs, hidden address bars, embedded WebViews, or future browser versions. Never infer a URL from page body text. Website filtering observes the UI; it does not filter network traffic.
 
 Source: [AccessibilityService API](https://developer.android.com/reference/android/accessibilityservice/AccessibilityService).
 
 ### 3.2 Uninstall resistance
 
-Normal Device Admin is not equivalent to device owner. The dedicated setUninstallBlocked API is not available to an ordinary consumer app merely because it is an active legacy administrator. An optional active-admin flow may introduce an additional deactivation step on this phone; Settings interception may stop normal attempts to reach it while Accessibility is operating. Both require device verification.
+Ordinary Device Admin does not grant device-owner powers. An active legacy administrator cannot use `setUninstallBlocked` merely because it has admin status. Admin activation may add a deactivation step on this phone. Settings protection may prevent normal navigation to that step while Accessibility runs. Test both effects.
 
-Label the option “Uninstall resistance,” explain the limitation, and display whether Device Admin is active separately from whether Settings protection is available. Request ordinary Device Admin when the user enables this option and test long-press launcher uninstall, uninstall from Settings, and administrator deactivation on the Xiaomi. Android may retain/recreate the launcher icon when uninstall is refused; FocusGate must not fake this by reinstalling itself or creating duplicate shortcuts. Do not call privileged uninstall-blocking APIs or request unrelated wipe/password policies.
+Label the option **Uninstall resistance**. Explain its limits. Show Device Admin status separately from Settings protection status. Request ordinary Device Admin when the user enables it. On Xiaomi, test launcher long-press uninstall, Settings uninstall, and admin deactivation.
+
+Android may keep or recreate the launcher icon after a refused uninstall. Do not simulate this by reinstalling FocusGate or adding duplicate shortcuts. Do not call privileged uninstall APIs or request unrelated wipe/password policies.
 
 Source: [DevicePolicyManager.setUninstallBlocked](https://developer.android.com/reference/android/app/admin/DevicePolicyManager#setUninstallBlocked(android.content.ComponentName,%20java.lang.String,%20boolean)).
 
-### 3.3 Persistence versus availability
+### 3.3 Stored state and service availability
 
-The locked session, rules, and quota records must survive screen off/on, activity dismissal, launcher restart, service restart, reboot, and ordinary process death. They must not reset when a service reconnects or a UI opens.
+Preserve locked sessions, rules, and quota records through screen off/on, activity dismissal, launcher restart, service restart, reboot, and ordinary process death. Opening the UI or reconnecting the service must not reset them.
 
-Actual enforcement depends on Android running the AccessibilityService. OS/OEM termination can create an enforcement gap. A disabled service cannot silently re-enable itself; a periodic worker cannot guarantee timely recovery. Force-stop, safe mode, cleared app data, uninstallation, and permission revocation remain limitations. Settings protection should resist normal permission-revocation/force-stop navigation where observable, but cannot promise immunity.
+Enforcement requires a running Accessibility service. Android or the manufacturer can stop it and cause a gap. A disabled service cannot enable itself. Periodic work cannot guarantee quick recovery. Force-stop, safe mode, data removal, uninstall, and permission revocation remain limits. Settings protection should resist observable normal routes to force-stop or revoke permissions. It cannot guarantee prevention.
 
-After reboot, normal enforcement resumes when Android reconnects the enabled service and the required storage becomes available. A minimal direct-boot record can retain locked status before first unlock; do not promise Accessibility-based enforcement before unlock without phone evidence.
+After reboot, enforcement resumes when Android connects the enabled service and storage becomes available. A minimal direct-boot record can retain locked status before first unlock. Do not claim pre-unlock enforcement without phone evidence.
 
 Sources: [Direct Boot](https://developer.android.com/privacy-and-security/direct-boot), [Android stopped-package behavior](https://developer.android.com/about/versions/android-3.1#launchcontrols).
 
 ### 3.4 Settings and Recents
 
-Selective Settings protection and Recents redirection are adapter capabilities, not universal Android APIs. Test the HyperOS Settings app, Security app, app-info screens, permission screens, launcher menus, and gesture/three-button navigation separately. Never claim “Recents disabled”; the app attempts to return Home after detecting it.
+Settings and Recents detection depends on device adapters. There is no universal API for these protections. Test HyperOS Settings, Security, app-info, permissions, launcher menus, gestures, and three-button navigation separately.
 
-If selective Settings classification is unreliable, offer explicitly chosen whole-Settings blocking. Do not silently upgrade selective blocking to whole-Settings blocking. Unknown screens in selective mode remain accessible and are reported as a coverage limitation.
+Describe Recents protection as returning Home after detection. Do not claim that it disables Recents.
+
+If selective Settings detection is unreliable, offer whole-Settings blocking as an explicit choice. Never switch to it silently. Allow unknown screens in selective mode and report the coverage limit.
 
 ## 4. Policy model
 
-Each blocker has an immutable ID, name, enabled flag, target set, schedule, optional quota, message, and revision. Targets are application package IDs, website host rules, or advanced URL patterns. Labels/icons are presentation data; renaming an app must not change matching.
+Each blocker has an immutable ID, name, enabled flag, targets, schedule, optional quota, message, and revision. Targets use package IDs, website hosts, or advanced URL patterns. Labels and icons are display data. An app rename must not change matching.
 
 ### 4.1 Schedules
 
-- A blocker can be always active, active on selected weekdays/time windows, active within a date range, or a combination.
-- Date range AND weekday/time conditions determine applicability. Multiple time windows within a schedule are ORed.
-- Intervals are start-inclusive and end-exclusive. Overnight windows belong to their starting weekday; Monday 22:00–02:00 includes Tuesday 00:00–02:00.
-- “Working hours” means user-configured weekdays and times, not a inferred holiday calendar. Weekend preset means Saturday/Sunday and is editable.
-- A quota blocker allows access while applicable until its quota is exhausted. Outside its active schedule it imposes no restriction.
-- A “block outside allowed hours” preset compiles into explicit blocking windows; its meaning must not be confused with quota applicability.
-- Show a plain-language preview and next transitions before saving a rule.
+- Support always active, selected weekdays/time windows, date ranges, and combinations.
+- Apply the date range AND the weekday/time conditions. Combine multiple time windows with OR.
+- Include the start and exclude the end. An overnight window belongs to its starting weekday. Monday 22:00–02:00 includes Tuesday 00:00–02:00.
+- Working hours use configured weekdays and times. Do not infer holidays. The editable weekend preset means Saturday/Sunday.
+- A quota blocker allows access within its schedule until the allowance runs out. It imposes no restriction outside that schedule.
+- Compile a “block outside allowed hours” preset into explicit blocking windows. Keep this distinct from a quota's active schedule.
+- Show a plain-language preview and next transitions before saving.
 
-### 4.2 Combining rules
+### 4.2 Overlapping rules
 
-Evaluate every applicable enabled blocker for the current target. Deny if ANY blocker denies. A quota allowance never overrides another block. Disabled blockers contribute nothing.
+Evaluate every applicable enabled blocker for the target. Deny access if any blocker denies it. A quota allowance never overrides another denial. Disabled blockers have no effect.
 
-If multiple applicable quotas cover the current activity, the same foreground elapsed time counts toward all of them. Time counts once within each shared group, even when several target patterns match. Denied time does not consume allowance.
+Charge foreground time to every applicable quota group. Charge once within each group, even if several targets match. Do not charge denied time.
 
-Show all denying rules in the app; the transient message uses a deterministic primary reason: unconditional denial first, then exhausted quota, then stable rule ID. Show the next candidate availability time, or “Blocked continuously,” without falsely promising access when another rule will still deny.
+Show all denying rules in the app. Choose the transient reason deterministically: unconditional denial first, then exhausted quota, then stable rule ID. Show the next possible availability time or **Blocked continuously**. Do not promise access if another rule will still deny it.
 
-### 4.3 Shared quota semantics
+### 4.3 Shared quotas and continuous sessions
 
-Default group: Edge, Chrome, Telegram, Ozon shopping. Combined 15 minutes in each clock hour, such as [10:00, 11:00). No rollover. Show the next reset time.
+The default group contains Edge, Chrome, Telegram, and Ozon shopping. It has 15 combined minutes per clock hour, for example `[10:00, 11:00)`. Unused time does not carry over. Show the next reset time.
 
-Support hourly and daily fixed windows plus configurable allowance length. A rolling window is out of first-release scope. UI must say “per clock hour” because 15 minutes before and 15 minutes after a boundary can produce 30 consecutive minutes of access unless the optional continuous-session cap is enabled.
+Support hourly and daily fixed windows with configurable allowances. Rolling windows are outside the first release. Label hourly quotas **per clock hour**. Without a continuous-session cap, 15 minutes before and 15 minutes after a boundary can allow 30 consecutive minutes.
 
-The user also requested a maximum continuous session feature. Each quota group can optionally have a maximum accumulated interactive-use duration per session and a required break duration. Proposed editor values are 15 minutes maximum and a five-minute break, configurable and off until selected. Switching within a group preserves the session; an hour/day reset does not reset it. Time away pauses accumulated use, but only one uninterrupted absence from all group targets lasting the required break resets the session. Screen-off/keyguard time counts toward that break. Returning early cancels the partial break. When the cap is exhausted, deny group access until the break completes, even if hourly allowance remains; attempted denied access does not consume usage or interrupt a break because the target was not allowed. Persist session use and last allowed-use end; restore elapsed absence conservatively using available clocks after reboot and document clock limits. Restricted Mode locks cap/break settings: enabling or lowering a cap is restrictive; disabling/raising it or shortening the required break is weakening. No automatic cap is hardcoded into presets.
+Each group can have an optional maximum continuous session and a required break. Proposed editor values are a 15-minute cap and a five-minute break. Both are configurable. The cap stays off until selected.
 
-Count interactive foreground use while screen on and unlocked. Stop at screen-off, keyguard, foreground change, denied activity, or unobservable state. Notification shade and Recents pause counting when detected. If a browser stays foreground, browsing across tabs does not reset the budget. No background audio accounting in version one.
+- Accumulate interactive use across apps in the group.
+- Keep session use across hour/day resets.
+- Pause accumulation while away from the group.
+- Reset the session only after one uninterrupted absence from all group targets for the full required break.
+- Count screen-off and keyguard time toward the break.
+- Cancel a partial break when allowed group use resumes early.
+- After the cap is exhausted, deny access until the break completes, even if period allowance remains.
+- Do not charge denied attempts or interrupt the break for them. The target was not allowed.
+- Persist session use and the end of last allowed use. After reboot, restore absence conservatively from available clocks and explain clock limits.
 
-For split-screen, count a group when a reliably observed interactive target is in use; if several windows belong to the same group, count elapsed time once. Unsupported multi-window/PiP classification must be surfaced and tested rather than assumed correct.
+Restricted Mode locks cap and break settings. Enabling or lowering a cap strengthens restrictions. Disabling or raising a cap, or shortening the break, weakens them. Do not hardcode a cap into presets.
 
-Use monotonic elapsed time for running consumption. Persist counters at foreground transitions, screen transitions, exhaustion, and at most five-second intervals during billable usage. Resume from a persisted checkpoint after process death; cap unrecorded usage loss at five seconds per ordinary death. Do not charge an entire unobserved downtime. Publish this small recovery limitation.
+Count interactive foreground use only when the screen is on and unlocked. Stop at screen-off, keyguard, foreground changes, denial, or unknown activity. Pause for notification shade and Recents when detected. Browser tab changes do not reset its budget. Version one does not count background audio.
 
-While a billable target is active, schedule a lightweight callback at the earliest quota/schedule boundary. Re-evaluate even when no accessibility event occurs, so a static page cannot outlive its allowance. No busy-loop polling or permanent wake lock. UI countdowns may refresh once per second only while visible; background status can update once per minute and at transitions.
+In split-screen, count reliably observed interactive use. Charge a group once if several windows belong to it. Report and test unsupported split-screen/PiP cases.
 
-### 4.4 Clock and timezone
+Use monotonic elapsed time for consumption. Save counters on foreground/screen transitions, exhaustion, and at intervals no longer than five seconds during billable use. Resume from the checkpoint after process death. Limit unsaved usage loss to five seconds per ordinary death. Do not charge unobserved downtime. Document this recovery limit.
 
-Unlocked rules follow the device timezone. Starting Restricted Mode captures a timezone for that session. Daily/hourly boundaries use that timezone until release, preventing timezone switching from trivially refreshing quotas.
+While a billable target stays active, schedule a lightweight callback at the earliest quota or schedule boundary. Re-evaluate even without a new Accessibility event. A static page must not exceed its allowance. Use no busy loop or permanent wake lock. Visible UI countdowns may update once per second. Background status may update once per minute and at transitions.
 
-Session duration uses monotonic time within a boot. Persist a UTC deadline plus boot/checkpoint information for reboot recovery. Repeated local-time windows during DST must have unique bucket identities derived from their actual instant; skipped local hours receive no extra bucket.
+### 4.4 Clocks and timezones
 
-Persist the greatest observed quota bucket to prevent a backwards wall-clock jump from replaying old allowances. A forward jump may create a later bucket; without a trusted external clock, time manipulation across reboot cannot be solved completely. Block normal date/time Settings access when protection is selected; document remaining limitations. Do not silently turn a timed session into an indefinite lock after a clock anomaly.
+Unlocked rules follow the device timezone. Capture the timezone when Restricted Mode starts. Use it for hourly/daily boundaries until release. A timezone change must not refresh the session's allowances.
 
-## 5. Website matching and browser behavior
+Use monotonic time for a session duration within one boot. Save a UTC deadline and boot/checkpoint metadata for reboot recovery. Repeated DST windows need separate bucket IDs based on their actual instants. Skipped local hours give no extra bucket.
 
-Default website targets:
+Save the greatest observed quota bucket. A backward clock change must not replay an old allowance. A forward change can reach a later bucket. Without a trusted external clock, the app cannot fully prevent time manipulation across reboot. Protect normal date/time Settings routes when selected. Explain remaining limits. A clock anomaly must not silently turn a timed lock into an indefinite lock.
 
-- youtube.com and its subdomains, youtu.be and its subdomains, youtube-nocookie.com and its subdomains.
-- instagram.com and its subdomains.
+## 5. Website matching and browsers
 
-Use parsed URI host comparisons with domain boundaries: youtube.com must not match notyoutube.com. Normalize host case and IDN representation; ignore fragments for matching. Handle browser-displayed URLs lacking a scheme. Host matching is the preferred editor.
+Default hosts, including subdomains:
 
-Advanced regex matches a normalized visible URL using explicitly documented full-match semantics. Provide validation and a local match tester. Use a linear-time regex engine compatible with offline Android execution, with length limits and explicit rejection of unsupported syntax. Never run an unbounded Java regex on the accessibility callback thread. Query strings may participate in matching in memory but must not be logged.
+- `youtube.com`, `youtu.be`, `youtube-nocookie.com`.
+- `instagram.com`.
 
-Ship separate adapters for installed Chrome and Edge. Each result is KnownUrl, UnknownUrl, or NotBrowser. Cache a known URL only while the same page can be tracked; invalidate on navigation uncertainty so a prior safe URL cannot authorize a new unknown page. Never treat text typed into the address bar as a confirmed navigation until supported UI signals establish it.
+Parse URI hosts and enforce domain boundaries. `youtube.com` must not match `notyoutube.com`. Normalize host case and IDN representation. Ignore fragments. Accept displayed URLs without a scheme. Prefer host rules in the editor.
 
-Unknown URL behavior is fixed to allow with a coverage warning in the first release: deny only a confidently identified URL that matches an enabled website rule. A separate app blocker can still deny the browser by package or exhausted quota. Invalidate stale URLs immediately on navigation uncertainty. Bound adapter retries within a one-second observation grace and never spin continuously. Browser foreground time still counts against applicable app quotas even when its URL is unknown. Provide a local troubleshooting status and URL match tester so the user can improve rules without collecting browsing history.
+Advanced regex uses full-match semantics on a normalized visible URL. Document that behavior. Add validation and a local match tester. Use a linear-time regex engine that runs offline on Android. Limit pattern length and reject unsupported syntax. Do not run unbounded Java regex on the Accessibility callback thread. Query strings can be matched in memory but must not be logged.
 
-Blocked website action remains Home redirection. Redirecting to a remote replacement such as https://github.com is deferred because directing the browser to fetch it would violate the intended no-network enforcement behavior. A future offline replacement page could be designed separately; do not automate address-bar editing in this release.
+Provide separate Chrome and Edge adapters. Results are `KnownUrl`, `UnknownUrl`, or `NotBrowser`. Cache a known URL only while the same page remains traceable. Clear it on navigation uncertainty. A previous safe URL must not authorize a new unknown page. Address-bar typing alone is not confirmed navigation; require supported UI signals.
 
-First release must test normal and private tabs, redirects, hidden address bars, app links, browser startup, and switching tabs. If an adapter cannot meet the agreed cases, label it unsupported and offer whole-browser blocking. Embedded browsers, alternate profiles, cloned apps, and unselected browsers do not inherit coverage automatically; list them in preflight guidance.
+Website rules allow unknown URLs in the first release. Report the coverage warning. Deny only a confidently identified URL that matches an enabled rule. Independent package/quota rules can still deny the browser. Browser foreground time still counts toward app quotas when the URL is unknown.
+
+Clear stale URLs immediately. Limit adapter retries to a one-second observation grace. Do not spin continuously. Provide local adapter status and a match tester without collecting history.
+
+Blocked websites return Home. Remote redirects, including `https://github.com`, are deferred because the browser would fetch network content. A future offline replacement page needs a separate design. Do not automate address-bar editing in this release.
+
+Test normal/private tabs, redirects, hidden address bars, app links, startup, and tab switches. If an adapter cannot meet the agreed cases, label it unsupported and offer whole-browser blocking. Explain that embedded browsers, other profiles, cloned apps, and unselected browsers do not automatically receive coverage.
 
 ## 6. Restricted Mode
 
-### 6.1 States
+### 6.1 States and release
 
-Unlocked and Locked are persisted configuration states. Healthy and Degraded are independent runtime health states. Expiry releases the configuration lock; it does not disable blockers.
+Persist `Unlocked` and `Locked` configuration states. Track `Healthy` and `Degraded` runtime health separately. Expiry unlocks settings; blockers stay enabled.
 
-Starting a session atomically stores its policy snapshot/revision, release condition, deadline when applicable, password-verifier reference, protection settings, and session ID. Do not display Locked before the durable transaction completes.
-
-Release choices:
+Starting a session must atomically store its policy snapshot/revision, release condition, deadline if needed, verifier reference, protections, and session ID. Show Locked only after the durable transaction succeeds.
 
 | Choice | Release condition |
 | --- | --- |
 | Password only | Correct trusted-person password |
 | Timer only | Deadline reached |
-| Password OR timer — proposed default | Either condition |
+| Password OR timer: default | Either condition |
 
+Offer one day, one week, and custom durations. Explain the consequences before start. Password only has no automatic release. Remember the last successful mode, duration, and additions choice locally. Each Start uses the saved password and computes a fresh full duration.
 
-Offer durations such as one day, one week, and custom duration. Explicitly summarize the consequences before starting, especially no automatic release for Password only. Remember the last successful mode/duration/additions locally; every Start computes a new deadline from that moment and reuses the saved password.
+Release requires the selected condition. It makes settings editable. It does not disable blockers. New sessions cannot use Password AND timer. Honor the original release condition of existing AND sessions; an upgrade must not weaken them.
 
-Release occurs only when the selected condition is satisfied and returns to editable configuration. Password AND timer is removed from new-session choices following user review. Existing persisted AND sessions retain their original release condition; never weaken an active session during an upgrade. No automatic blocker disabling. With Password OR timer, a trusted person can release early; the user can then disable selected ordinary blockers and start a new locked session anytime. A timed temporary pause with automatic re-enablement is a separate future feature, not an implied first-release password action. Timer-only controls expose no password override. No “forgot password” bypass while locked. Lost-password guidance must explain that the selected release policy still applies; app data removal is outside the protection guarantee.
+With OR, a trusted person can release early. The user can then disable ordinary blockers and start a new session. Automatic temporary pause/re-enable/relock is a future feature. Timer only has no password override. Do not provide a forgotten-password bypass while locked. Explain that the selected release policy still applies. App data removal remains outside the protection guarantee.
 
-### 6.2 Protected mutations
+### 6.2 Protected changes
 
-While locked, deny disabling/deleting existing blockers, removing targets, loosening schedules or quotas, changing release conditions/password, reducing protection, resetting counters, importing configurations, restoring defaults, clearing diagnostics through a path that also clears state, or enabling bypass/debug actions. Enforce this in the domain mutation layer, not merely disabled buttons.
+While locked, reject these changes in the domain transaction layer, not only in the UI:
 
-Separate harmless presentation preferences, such as theme, from policy settings. Export remains available but includes no password verifier, active session, usage counters, or logs. Avoid enabling external intents or components that mutate rules without the same checks.
+- Disable/delete blockers or remove targets.
+- Loosen schedules or quotas.
+- Change release conditions or the password.
+- Reduce protections or reset counters.
+- Import configurations or restore defaults.
+- Clear diagnostics through an action that also clears state.
+- Enable debug/bypass actions.
 
-### 6.3 Adding restrictions while locked
+Keep harmless display preferences, such as theme, separate from policy. Allow export without verifier, active session, counters, or logs. Apply the same guards to external intents and components that can change rules.
 
-Make this an explicit pre-session option, enabled by proposed default. Support only operations that are structurally provable to strengthen policy: add a new enabled independent blocker, add targets to an existing blocker, or lower an existing quota allowance. Adding a target to a shared group preserves accumulated usage and can never reset the group.
+### 6.3 Add restrictions while locked
 
-Do not allow arbitrary regex/schedule editing, changing quota periods, disabled replacement rules, or other changes that require proving general policy equivalence. Newly added rules stay locked until release. Warn before saving: the addition cannot be undone during the session.
+Offer an explicit option before start. The proposed default is on. Allow only structurally proven stronger changes: add a new enabled independent blocker, add targets to an existing blocker, or lower a quota allowance. Adding a shared-group target must preserve its usage.
+
+Do not allow arbitrary regex/schedule changes, quota-period changes, disabled replacement rules, or changes that require proving general policy equivalence. Keep new rules locked until release. Warn that the user cannot undo an addition during the session.
 
 ### 6.4 Password storage
 
-A trusted person sets the local password while unlocked. Never store plaintext or reveal a saved password. Each input may temporarily show its current text through an explicit eye toggle; it starts masked and returns to masked when cleared or recreated. Use a versioned, salted slow password verifier with device-benchmarked work factor; store verifier data only in private storage. Use Android Keystore-backed protection where appropriate without claiming it resists rooted/ADB attacks.
+A trusted person sets the password while unlocked. Store no plaintext and never reveal the saved password. An eye control may show only the text currently entered into that field. Start masked. Return to masked when cleared or recreated.
 
-Persist failed-attempt count and exponential retry delay, capped at 15 minutes; successful verification clears it. Throttling cannot delay timer-based automatic release. No secret values in diagnostics, exports, screenshots generated by the app, or source code.
+Use a versioned, salted, slow verifier. Benchmark its work factor on the phone. Keep verifier data in private storage. Use Android Keystore protection where appropriate, without claiming protection against root/ADB attacks.
+
+Persist failed attempts and an exponential retry delay capped at 15 minutes. Successful verification clears them. Retry throttling must not delay timer release. Do not put secrets in diagnostics, exports, app-generated screenshots, or source code.
 
 ## 7. Optional device protections
 
-Settings protection options: off; sensitive screens only; whole Settings. Sensitive screens include this app's app-info/uninstall/force-stop/data-clear routes, Accessibility management, Device Admin management, battery/autostart controls, and date/time controls. Protection applies whenever its toggle is enabled, independently of Restricted Mode; the mode locks that toggle.
+Settings choices are off, sensitive screens only, or whole Settings. Sensitive routes include FocusGate app-info/uninstall/force-stop/data-clear, Accessibility, Device Admin, battery/autostart, and date/time. Enforce a selected protection outside Restricted Mode too. Restricted Mode locks its toggle.
 
-Allow explicit Wi-Fi/mobile-network exceptions only where the device adapter reliably identifies their screens. On uncertainty, sensitive-only protection follows its documented limitation; whole-Settings protection denies unidentified Settings screens. SystemUI quick toggles should remain usable unless a later explicit feature says otherwise. Never block the launcher, lockscreen, dialer/emergency UI, or FocusGate itself as an ordinary target.
+Allow explicit Wi-Fi/mobile-network exceptions only when the adapter reliably identifies them. Sensitive-only mode allows unknown screens. Whole-Settings mode denies unidentified Settings screens. Keep SystemUI quick toggles usable unless a later explicit feature changes this. Never use the launcher, lockscreen, dialer/emergency UI, or FocusGate itself as ordinary blocked targets.
 
-Permission repair must not deadlock: offer an explicit repair action that grants a short, package/screen-scoped exception only to the missing required permission's setup flow. Never create a general Settings bypass or exempt app-info/data-clear routes. If the adapter cannot safely constrain the repair flow, require the configured password release or timed release and explain that limitation.
+Permission repair must not trap the user. Offer an explicit short exception scoped to the package and screen of a missing required grant. Do not provide a general Settings bypass or exempt app-info/data-clear. If the adapter cannot safely limit the route, require normal password/timer release and explain why.
 
-Recents protection has its own toggle and tested capability status. A detected Recents screen invokes Home, with throttling to avoid loops. It must not mistake normal launcher use for Recents. Enabling it does not magically protect swipe-away on unrecognized OEM surfaces.
+Recents has its own toggle and tested capability status. On detection, return Home with throttling. Do not mistake normal launcher use for Recents. This cannot protect unknown manufacturer surfaces.
 
-Uninstall resistance separately requests optional Device Admin and explains its extra deactivation step and limitations. Do not automatically toggle it off on session expiry; the user changes it after unlock.
+Uninstall resistance separately requests optional Device Admin. Explain the added deactivation step and its limits. Expiry must not switch it off automatically. The user changes it after release.
 
-## 8. Permissions, preflight, and health
+## 8. Permissions, setup checks, and health
 
-Required for enabled blockers: connected AccessibilityService with necessary event/window capabilities. Request notification permission when the user chooses notifications/countdown; it is not required for core Home redirection.
+Enabled blockers need a connected Accessibility service with the required event/window access. Request notification permission for chosen notifications/countdowns. Core Home redirection does not require it.
 
-Usage Access is optional for diagnostics/reconciliation, not the primary quota clock or a universal required grant. Device Admin is optional for uninstall friction. Avoid broad installed-package visibility unless demonstrably needed; prefer querying launchable apps and known browser packages. Include a manual package-ID route for supported non-launchable targets.
+Usage Access is optional for diagnostics/reconciliation. It is not the primary usage clock or a universal required grant. Device Admin is optional. Query launchable apps and known browsers before requesting broad package visibility. Add manual package-ID entry for supported targets without launcher entries.
 
-Explain Xiaomi autostart and battery restrictions with device-tested instructions. Read only settings that have a public or validated observable signal; otherwise show “User confirmed” or “Unknown,” not a fabricated green status. Provide restricted-settings guidance if the sideload installation flow requires it. Never change system permissions silently.
+Explain Xiaomi autostart and battery settings using tested instructions. Read settings only through public or validated signals. Otherwise show **User confirmed** or **Unknown**. Do not show a false verified status. Explain restricted-settings steps when sideloading requires them. Never change system grants silently.
 
-Preflight before starting Restricted Mode:
+Before Restricted Mode starts:
 
-1. Summarize enabled blockers, their schedules and quota reset behavior.
-2. Verify required Accessibility connection, selected browser/protection capabilities, and release prerequisites.
-3. Explain known degraded protections and unknown OEM setup status.
-4. Refuse lock if core Accessibility is disconnected or required release credentials are absent. Optional capability gaps require explicit acknowledgement, not a false successful check.
-5. Recommend a short test session before a long commitment and show how release will work.
+1. Summarize enabled rules, schedules, and quota resets.
+2. Check Accessibility, selected browser/protection capabilities, and release prerequisites.
+3. Explain degraded protections and unknown manufacturer setup.
+4. Refuse start if Accessibility is disconnected or required credentials are missing. Require explicit acknowledgement of optional capability gaps.
+5. Recommend a short trial and explain release before a long lock.
 
-Check health on app open, service connect/disconnect, foreground transitions when cheap, screen unlock, package replacement, and boot recovery. Add unique WorkManager periodic work, proposed interval 30 minutes, to refresh best-effort health while the OS permits. It is not a watchdog or quota enforcement timer.
+Check health on app open, service connection changes, cheap foreground transitions, screen unlock, package replacement, and boot recovery. Use unique periodic WorkManager work, with a proposed 30-minute interval. It updates health when Android permits. It is not a watchdog or enforcement timer.
 
-Keep degraded status local and notify when permitted. With the process/service stopped, health warnings may also be delayed. Never claim the app can always detect its own suspension immediately.
+Keep degraded status local and notify when allowed. Health warnings can also be delayed while the process/service is stopped. Do not promise immediate detection of suspension.
 
-Prefer the system-bound AccessibilityService without an extra always-on foreground service. Add one only if measured phone evidence justifies it; Android 14 type/permission and background-start rules must be satisfied. Do not misuse unrelated service types.
+Prefer the system-bound Accessibility service. Add foreground service priority only when measured phone evidence justifies it. Follow Android 14 service type, permission, and background-start rules. Do not misuse an unrelated type.
 
-2026-10-03 implementation refinement: measured HyperOS `SwipeUpClean` termination justified foreground promotion of the existing Accessibility service, rather than adding another service or polling watchdog. Use a quiet ongoing notification and Android 14 `specialUse` declaration while enabled blockers or Settings/Recents protections need enforcement. Handle promotion refusal without crashing Accessibility. True Background autostart and No restrictions remain manual OEM setup; foreground priority is not a survival guarantee.
+**2026-10-03 implementation refinement:** observed HyperOS `SwipeUpClean` termination justified promoting the existing Accessibility service. Use no extra service or polling watchdog. Use a quiet ongoing notification and Android 14 `specialUse` declaration while blockers or Settings/Recents protections need enforcement. A refused promotion must not crash Accessibility. Background autostart and No restrictions remain manual setup. Foreground priority is not a survival guarantee.
 
 Sources: [PeriodicWorkRequest](https://developer.android.com/reference/androidx/work/PeriodicWorkRequest), [Android 14 foreground service requirements](https://developer.android.com/about/versions/14/changes/fgs-types-required).
 
 ## 9. User interface
 
-Native Kotlin UI, proposed Jetpack Compose with Material components. Lightweight layouts, system typography, light/dark themes, accessible text scaling, and no decorative image pipeline.
+Use lightweight native Kotlin UI, initially proposed as Compose with Material components. Use system typography, light/dark themes, and accessible text scaling. Avoid a decorative image pipeline.
 
-Bottom tabs:
+| Bottom tab | Content |
+| --- | --- |
+| Blockers | Rule cards, next transition, shared time remaining, add/edit, app picker, websites, local tester |
+| Restricted Mode | Lock status, health, release choice, time remaining, start/release, protections, allowed additions |
+| More | Setup, guide, FAQ/introduction, import/export, privacy, diagnostics, version, donation information |
 
-- **Blockers:** enabled/disabled cards, next schedule transition, shared allowance remaining, add/edit flow, app picker, website editor, local rule tester.
-- **Restricted Mode:** editable/locked status, health, release policy, remaining lock duration, start/release action, protections, and permitted restrictive additions.
-- **More:** setup health, usage instructions, FAQ/introduction, import/export, privacy, diagnostics, app version, and donation information.
+Rule cards distinguish disabled, inactive schedule, allowed with quota, and denying. Keep missing app targets visible. Reinstalling the same package restores matching. Offer presets for review; do not silently enable them on first launch.
 
-Blocker cards clearly distinguish disabled, inactive schedule, allowed with remaining quota, and currently denying. Missing/uninstalled apps remain visible as missing targets without losing policy; reinstalling the same package restores matching. Presets are offered for review and are not silently activated at first launch.
+Show shared time remaining in Blockers and an optional notification. Measure any optional small Accessibility countdown overlay on the phone. Avoid an extra generic draw-over-apps grant when unnecessary. Keep usage-countdown and lock-countdown visibility separate. Hiding a countdown must not affect enforcement.
 
-Show remaining shared time in the Blockers tab and optional ongoing notification. Optional small Accessibility overlay countdown while a monitored app is in use must be measured on the device; avoid an additional generic draw-over-apps grant where unnecessary. Separate visibility preferences for remaining usage time and remaining lock time. Hiding a countdown does not disable enforcement.
-
-On denial, Home redirection is the primary action. An optional short overlay/toast shows the custom blocker message and reason. Rate-limit repeated messages and Home actions, avoid focus capture and sensitive text, and ensure the message does not trap the user on the launcher.
+Return Home on denial. An optional short overlay/toast can show the custom message and reason. Limit repeated feedback and Home actions. Avoid focus capture and private text. Feedback must not trap the user on the launcher.
 
 ## 10. Initial presets
 
-Offer these on onboarding and in the preset picker, with confirmation:
+Offer presets during onboarding and in a picker. Require confirmation.
 
 | Preset | Targets | Policy |
 | --- | --- | --- |
-| No YouTube or Instagram | com.google.android.youtube; com.instagram.android; YouTube/Instagram host rules | Always deny |
-| Shared distraction budget | com.microsoft.emmx; com.android.chrome; org.telegram.messenger; ru.ozon.app.android | Shared 15 minutes per clock hour, every day |
+| No YouTube or Instagram | `com.google.android.youtube`; `com.instagram.android`; YouTube/Instagram hosts | Always deny |
+| Shared distraction budget | `com.microsoft.emmx`; `com.android.chrome`; `org.telegram.messenger`; `ru.ozon.app.android` | Shared 15 minutes per clock hour, every day |
 
-The installed ru.ozon.fintech.finance package is Ozon Bank and is not included by default. Package IDs observed on this phone are fixtures, not assumptions for every user/device. App-picker labels identify the actual installed packages. Selecting browser websites does not consume extra group time in addition to the browser app.
+Do not include Ozon Bank, `ru.ozon.fintech.finance`. Observed package IDs are fixtures, not universal assumptions. Show actual installed packages in the app picker. Matching browser websites must not charge extra time beyond the browser's group use.
 
 ## 11. Architecture and local storage
 
-Keep the policy engine independent of Android UI/services. Proposed units:
+Keep the policy engine separate from Android UI/services. Proposed units:
 
 | Unit | Responsibility | Inputs/outputs |
 | --- | --- | --- |
-| PolicyEngine | Schedule, target, overlap and quota decisions | Observation + policy + clock -> decision + next transition |
-| UsageLedger | Foreground intervals, checkpoints, bucket identities | Session observations -> durable counters |
-| RestrictedSessionController | Release checks and mutation authorization | Commands -> authorized state transitions |
-| AccessibilityObserver | Narrow event observation, adapter routing | Android events -> normalized observations |
-| Browser/Settings/Recents adapters | Device-specific interpretation | Relevant nodes/windows -> typed result or unknown |
-| EnforcementController | Home action, feedback and debounce | Denial -> bounded UI action |
-| ConfigurationRepository | Versioned atomic policy/session persistence | Transactional reads/writes |
-| HealthMonitor | Grant/capability status and warnings | Public/device-tested signals -> status |
-| ImportExport | Validated offline configuration interchange | Local document -> validated proposed configuration |
+| PolicyEngine | Schedules, targets, overlapping rules, quotas | Observation + policy + clock -> decision + next transition |
+| UsageLedger | Foreground time, checkpoints, buckets | Observations -> stored counters |
+| RestrictedSessionController | Release and change guards | Commands -> allowed state changes |
+| AccessibilityObserver | Narrow Android observations | Events -> normalized observations |
+| Browser/Settings/Recents adapters | Device-specific detection | Relevant nodes/windows -> result or unknown |
+| EnforcementController | Home, feedback, debounce | Denial -> bounded UI action |
+| ConfigurationRepository | Atomic versioned storage | Transactional reads/writes |
+| HealthMonitor | Grants, capabilities, warnings | Public/tested signals -> status |
+| ImportExport | Validated local configuration transfer | Local file -> proposed configuration |
 
-Use Room for structured policy, session and ledger transactions; small UI preferences can use DataStore. Persist policy revision with observations to prevent stale evaluation after edits. Serialize ledger/policy changes through one owner; database transactions guard lock-start and authorized mutation. Do not block Android accessibility callbacks with database IO or regex work.
+Use Room for atomic policy, session, and ledger storage. The original design allowed DataStore for small UI preferences. Current implementation stores preferences in the same Room document; see development context. This is not an instruction to split storage.
 
-Store minimal direct-boot session metadata separately if needed; credential-sensitive data remains credential-protected. The full policy is reloaded after unlock, and no quota/session reset occurs during reconciliation.
+Associate policy revisions with observations to avoid stale decisions. Serialize ledger/policy changes through one owner. Use transactions for lock start and guarded changes. Keep database IO and regex work off Accessibility callbacks.
 
-Only necessary receivers/components are exported, with appropriate platform restrictions. Release builds have no exported debug bypass. Disable app backup/device-transfer of policy, verifier, active session, counters, and diagnostics; configuration transfer is explicit through import/export.
+Keep only minimal direct-boot metadata outside credential-protected storage. Reload full policy after unlock without resetting quota or session.
 
-Comments should explain policy invariants, Android lifecycle surprises, clock decisions, and adapter limitations in plain English. Prefer readable Kotlin over clever abstractions for a maintainer who is learning Kotlin.
+Export only required components and apply platform restrictions. Release builds must have no exported bypass. Disable backup/device-transfer of policy, verifier, session, counters, and diagnostics. Configuration transfer must be explicit.
 
-## 12. Privacy, export/import, diagnostics, donations
+Comments should explain policy rules, lifecycle surprises, clocks, and adapter limits in plain English. Favor readable Kotlin over clever abstractions for the maintainer.
 
-No INTERNET or ACCESS_NETWORK_STATE permissions in the final merged manifest. No HTTP clients, remote fonts, analytics/crash SDKs, ads, telemetry, or automatic update checks. Android/platform activity outside FocusGate is not controlled by this promise. Development tooling may download dependencies; runtime app execution is offline.
+## 12. Privacy, transfer, diagnostics, and donations
 
-Accessibility nodes can contain private data. Inspect only relevant package/window fields and known address-bar or Settings identifiers. Never collect page text, messages, screenshots, clipboard, or browsing history. Retain URL only transiently for matching; diagnostics use rule IDs and typed failure reasons rather than raw URL/domain/path/query data. Package diagnostics are opt-in and clearly disclosed.
+The merged manifest must contain no `INTERNET` or `ACCESS_NETWORK_STATE`. Use no HTTP clients, remote fonts, analytics/crash SDKs, ads, telemetry, or update checks. Other Android apps can still use networks. Development tools may download dependencies; the running app stays offline.
 
-Export/import uses Android Storage Access Framework and versioned JSON. Export rules, groups, schedules and presentation preferences only. Explain that selecting a cloud-backed document provider uses that other app/service; FocusGate makes no network requests. Recommend a local file location.
+Accessibility nodes can contain private data. Inspect only needed package/window fields and known address-bar/Settings identifiers. Collect no page text, messages, screenshots, clipboard, or history. Keep URLs only transiently for matching. Diagnostics use rule IDs and typed reasons, never raw URL/domain/path/query data. Package diagnostics are opt-in with clear disclosure.
 
-Import while unlocked offers replace or merge with preview. Generate/remap IDs transactionally for merges. Validate size, version, regex, targets, schedule ranges, quota relationships and referential integrity; reject unsupported future schemas without partial writes. Imports never restore usage budgets, passwords, active sessions, Device Admin, or OS grants. Imported protection preferences require capability review before activation.
+Use Android Storage Access Framework and versioned JSON for transfer. Export rules, groups, schedules, and display preferences only. Explain that choosing a cloud document provider may use that other app's network. Recommend a local file.
 
-Developer diagnostics are off by default. Use a private bounded ring buffer, proposed cap 1 MB, with timestamp, event category, rule ID, reason, state transition, grant status and timing. No credentials or raw node content. Local export is explicit and separate from configuration export. Locked sessions may allow read-only diagnostics but no simulated clock, quota reset, policy reset, or release bypass.
+While unlocked, offer replace or merge with preview. Generate/remap merge IDs in a transaction. Validate size, version, regex, targets, schedules, quotas, and references. Reject future schemas and invalid input without partial writes. Never import usage budgets, passwords, sessions, Device Admin grants, or OS grants. Review imported protection preferences before activation.
 
-Donation panel is static offline information: optional maintainer-provided cryptocurrency network/address, copy action, and locally rendered QR. Create a clearly commented DonationConfig.kt with DONATION_NETWORK and DONATION_ADDRESS empty placeholder constants that the maintainer can find and replace later. No invented address, wallet/network request, balance lookup, embedded checkout, or donation-gated feature. If no verified address has been supplied, hide the payment controls and show only a short future-support note.
+Diagnostics start off. Use a private bounded ring buffer with a proposed 1 MB cap. Allowed fields are timestamp, category, rule ID, reason, state transition, grant status, and timing. Include no credentials or raw node content. Export diagnostics explicitly, separately from configuration. Locked sessions may allow read-only diagnostics. They must not allow simulated clocks, quota/policy reset, or release bypass.
 
-## 13. Introduction and user help content
+Keep donations static and offline. A supplied cryptocurrency network/address may support copying and a locally generated QR. Put clearly commented empty `DONATION_NETWORK` and `DONATION_ADDRESS` constants in `DonationConfig.kt`. Invent no address. Add no wallet/network request, balance check, checkout, or donation-gated feature. Without a verified address, hide payment controls and show a future-support note.
 
-Introduction: “FocusGate adds a pause between an impulse and another hour of scrolling. Choose your rules, test them, then lock them for a commitment you want to keep. Your settings stay on this phone.”
+Show the public GitHub repository link in More with **Copy repository link**. Add a clearly named empty Telegram feedback-link placeholder for the maintainer. Show **Coming soon** while it is empty. If configured later, display the link and allow copying it. Do not invent a contact address. These actions copy only; FocusGate must not fetch links or open another app. The user can paste a copied link elsewhere. That other app may use the network.
 
-Usage guide must cover:
+## 13. Introduction and help
 
-1. Grant Accessibility after reading what it observes and why.
-2. Review presets, installed app targets, browser coverage and shared budget.
-3. Test redirection and a short quota while configuration remains editable.
-4. Set a trusted-person password and/or timer, review protections, and run preflight.
-5. Start a short Restricted Mode trial, verify release, then choose a longer commitment.
-6. Check health after restart/updates, and export a local configuration backup if desired.
+Suggested introduction: “FocusGate adds a pause before more scrolling. Choose your rules, test them, then lock them for the time you choose. Your settings stay on this phone.”
 
-FAQ answers must explicitly cover: why blockers still work after lock expiry; shared quota and clock-hour boundary behavior; forgotten password by release policy; browser unknown-URL fallback; private/embedded browser limitations; background YouTube/audio; battery/autostart guidance on Xiaomi; why Device Admin is not an uninstall guarantee; force-stop/permission loss; offline privacy; repairing grants; how to turn protections off and uninstall after release; why import cannot unlock/reset a session.
+The guide must cover:
+
+1. Read the disclosure and grant Accessibility.
+2. Review presets, apps, browser coverage, and the shared budget.
+3. Test redirection and a short quota while settings stay editable.
+4. Set a trusted-person password and/or timer, review protections, and run setup checks.
+5. Try a short lock and its release before a long commitment.
+6. Check health after restarts/updates and optionally export a local backup.
+
+FAQ must explain blockers after expiry, shared quotas, clock-hour boundaries, forgotten passwords by release policy, unknown URLs, private/embedded browsers, background YouTube/audio, Xiaomi battery/autostart, Device Admin limits, force-stop/permission loss, offline privacy, grant repair, release before uninstall, and why import cannot unlock/reset a session.
 
 ## 14. Acceptance and verification
 
-### Pure policy and persistence tests
+These items define required test coverage. They do not claim that tests passed. Record actual results in testing documents.
 
-- Each enabled blocker enforces outside Restricted Mode; disabling it while unlocked stops its contribution.
-- Any denying rule wins over an allowing quota; overlapping quotas count an interval once per group.
-- Shared group: seven minutes Chrome + eight minutes Telegram exhausts the allowance for all four packages; Ozon Bank remains outside the preset.
-- Boundary cases: hourly/daily reset, midnight, overnight windows, weekdays, date-range endpoints, timezone changes, DST and backward clock jumps. Continuous-session cap persists across group switches/hour boundaries/restarts; short absence does not reset it; a full uninterrupted configured break does.
-- Static foreground content is redirected at quota exhaustion and schedule start without requiring a new UI event.
-- Every release policy has truth-table tests; expiry unlocks configuration but leaves blockers enabled.
-- Locked mutation tests cover UI and repository/domain entry points, imports, counters, protections, password and debug operations.
-- Restrictive-only additions preserve counters; attempted weakening is rejected.
-- Password delay persists through process restart; timer release remains independent.
-- Transaction failures never leave a UI claiming an undurable locked state; migration preserves active sessions and counters.
-- Malformed/oversized imports and unsupported regex are rejected atomically. Domain boundaries prevent false substring matches.
+### Policy and storage tests
 
-### Primary-phone acceptance matrix
+- Enabled rules enforce outside Restricted Mode. Disabling an unlocked rule removes its effect.
+- Denial wins over quota allowance. Charge overlapping matches once per group.
+- Seven minutes of Chrome plus eight minutes of Telegram exhaust all four group targets. Exclude Ozon Bank.
+- Test hourly/daily reset, midnight, overnight windows, weekdays, date-range endpoints, timezone changes, DST, and backward clock changes.
+- Keep continuous-session use across app switches, hour boundaries, and restarts. Short absence does not reset it. A full uninterrupted break does.
+- Redirect static content at quota exhaustion and schedule start without a new UI event.
+- Test release truth tables, including legacy AND. Reject new AND sessions. Expiry keeps blockers enabled.
+- Test locked changes through UI, repository/domain, import, counters, protections, password, and debug paths.
+- Additions preserve counters. Reject weaker settings.
+- Keep password delays across restart. Timer release stays independent.
+- Failed transactions must not show an unsaved Locked state. Migrations keep sessions and counters.
+- Reject malformed/oversized imports and unsupported regex atomically. Test host boundaries.
 
-Record Android/HyperOS version, browser versions, navigation mode, grants, battery/autostart setup and observed results. Use a short test session; do not create a week-long unreleasable test lock.
+### Primary-phone matrix
 
-- YouTube/Instagram native apps and supported browser domains return Home; unrelated sites remain accessible when identifiable and otherwise allowed.
-- Chrome/Edge normal/private mode, hidden address bar, navigation, redirects and tab changes meet documented coverage or expose explicit unsupported state. Unknown/unidentified URLs are allowed by website rules, stale known URLs are invalidated, and independent app/quota denials still apply.
-- App switching does not multiply quota; screen-off/lock pauses accounting; quota does not reset after service/process restart.
-- Measured engineering target: native app redirection within one second of an observable foreground event; supported known URL redirection within two seconds. Report measured distribution and any failures rather than claiming an Android-wide guarantee.
-- Screen off/on, activity swipe-away, launcher restart, service reconnection, process death, reboot before/after first unlock, and app update preserve locked policy. Measure reconnection gaps separately from persistence.
-- Force-stop and Accessibility revocation show the documented degradation after the app can run again; never report continuous protection during unavailable service time.
-- Test sensitive Settings pages, whole-Settings mode, Wi-Fi/mobile exceptions, scoped repair flow, uninstall attempts, and Recents under gesture and button navigation. Unsupported protections remain labelled unavailable.
-- Split-screen/PiP, incoming calls, emergency UI and notification shade do not cause launcher loops or unsafe obstruction.
-- Compare idle and active-use battery/CPU over a documented baseline and monitored session. Require no persistent wake lock, no idle high-frequency loop, no ANR/crash, bounded adapter retries, and bounded logs. Quantitative battery claims require measurements.
-- Verify final merged manifest has no network permissions, backups are excluded, and release/debug component exposure matches the spec. Inspect logs/exports for sensitive fields.
+Record Android/HyperOS, browser versions, navigation mode, grants, battery/autostart setup, and results. Use short test sessions. Do not create an unreleasable week-long test lock.
+
+- Native YouTube/Instagram and supported matching websites return Home. Identified unrelated sites remain allowed; unknown sites also remain allowed by website rules.
+- Test Chrome/Edge normal/private tabs, hidden address bars, navigation, redirects, startup, and tab changes. Report unsupported cases. Clear stale URLs. Keep independent app/quota denials.
+- Switching apps must not multiply usage. Screen-off/lock pauses it. Service/process restart must not reset quotas.
+- Measure native redirection against a one-second target after an observable event. Measure known-URL redirection against a two-second target. Report distributions and failures; these are not Android-wide guarantees.
+- Test screen off/on, swipe-away, launcher restart, service reconnection, process death, reboot before/after first unlock, and app update. Preserve locked policy. Measure connection gaps separately.
+- After force-stop or Accessibility revocation, report degradation once the app can run. Do not claim protection while the service was absent.
+- Test sensitive/whole Settings, Wi-Fi/mobile exceptions, scoped repair, uninstall attempts, and gesture/button Recents. Label unsupported protection unavailable.
+- Test split-screen/PiP, incoming calls, emergency UI, and notification shade for unsafe blocking or launcher loops.
+- Compare idle/active CPU and battery with a documented baseline. Require no permanent wake lock, idle high-frequency loop, ANR/crash, unbounded retries, or unbounded logs. Measure before making battery claims.
+- Check the merged manifest, backup exclusions, release/debug exports, logs, and exported files for privacy compliance.
 
 ### Completion criteria
 
-The first release is usable only when both target scenarios and all core lock/recovery tests pass on the Xiaomi. Settings/Recents/uninstall friction may ship with clear tested capability limits; failures cannot silently change the agreed unknown-URL behavior or weaken configuration locking. Deliver an APK, readable source/comments, local user guide, recorded phone results, known limitations, and GitHub history without secrets.
+The first release is usable when both target scenarios and core lock/recovery phone tests pass on Xiaomi. Optional Settings/Recents/uninstall friction may ship with tested limits. Failures must not change unknown-URL policy or weaken locking.
 
-## 15. Review decisions
+Deliver an APK, readable source/comments, local guide, phone results, known limits, and GitHub history without secrets.
 
-The user reviewed and accepted the design with the corrections recorded in section 1. Approved decisions: clock-hour budgets, Password OR timer default, allow unknown URLs, restrictive-only additions, editable presets, ordinary Device Admin/Settings friction, and FocusGate name. The user subsequently requested an optional continuous-session cap; include it in the first release with the proposed configurable defaults in section 4.3. Review the implementation plan before starting product code.
+## 15. Approved decisions and follow-ups
 
-No donation address, signing secret, GitHub token, or private phone identifier belongs in this repository.
+The user accepted clock-hour quotas, OR by default, unknown URLs allowed, restrictive additions, editable presets, ordinary Device Admin/Settings friction, and the FocusGate name. The optional configurable continuous-session cap is in first-release scope. Keep the proposed values in section 4.3.
 
-## Password lifecycle clarification (user follow-up)
+The user already approved implementation. Follow the current roadmap; do not repeat the original design/plan approval step. Keep donation addresses, signing secrets, GitHub tokens, and private phone identifiers out of the repository.
 
-Display explicit Password set / No password set status. Initial setup uses new password plus repeated confirmation. A separate Change password action requires current password, new password, and repeated confirmation. Verify current credentials inside the durable transaction, preserve the verifier on failure, apply persisted retry delays to incorrect current-password attempts, and refuse changes during active Restricted Mode. Release/expiry never deletes the password. A new session reuses it and starts the full selected duration afresh. Password-only start must not depend on text in an inactive duration field.
+### Password lifecycle clarification
 
-Offer Remove password while unlocked, requiring the current password and the same persisted retry throttle. Successful removal clears the verifier and retry state but preserves blockers, usage, protections, and remembered lock choices. Afterwards, and on first use, setup asks only for the new password and confirmation. Removal is refused during any active session. Explain before removal and beside release choices that Password only and Password OR timer cannot start without a saved password. Never silently convert OR to Timer only: the user may explicitly choose Timer only (no early password override), or set a new password. Add an independent show/hide eye control to every password input; never expose saved credentials through it or through ADB.
+Show **Password set** or **No password set**. First setup asks for a new password and confirmation. Change password asks for current, new, and confirmation. Verify the current password inside the durable transaction. On failure, keep the verifier and persist retry delays. Refuse changes during Restricted Mode.
+
+Release/expiry keeps the password. Each new session reuses it and starts a fresh full duration. Password-only start must not depend on an inactive duration input.
+
+Offer **Remove password** only while unlocked. Require the current password and shared retry delay. Successful removal clears verifier and retry state. Preserve blockers, usage, protections, and remembered lock choices. First setup and setup after removal ask no old password.
+
+Reject removal during every active session. Explain before removal and beside release choices that Password only and Password OR timer need a saved password. Never silently convert OR to Timer only. The user can explicitly choose Timer only, which has no early password override, or set a new password.
+
+Every password input has an independent eye control. It can reveal current input only. ADB must not expose saved credentials.

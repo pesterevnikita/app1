@@ -1,69 +1,79 @@
 # Development and recovery context
 
-FocusGate is an offline Kotlin/Compose Android app for interrupting procrastination. Application ID: `io.github.pesterevnikita.focusgate`. Repository: `https://github.com/pesterevnikita/app1`. Work started on branch `feat/focusgate`; inspect `git status` and recent history rather than assuming the branch or commit is unchanged.
+**TL;DR:** Read the roadmap and phone acceptance before work. Build with JDK 21 and the local Android SDK. Preserve app data during updates. The app works offline, but full phone acceptance is incomplete. Password removal requires an unlocked configuration.
 
-## Start after a handoff or context compaction
+FocusGate is an offline Kotlin/Compose Android app. Application ID: `io.github.pesterevnikita.focusgate`. Repository: `https://github.com/pesterevnikita/app1`. Work started on `feat/focusgate`. Inspect current Git state; do not assume the branch or commit is unchanged.
 
-1. Read root `AGENTS.md`, the accepted design, and `docs/testing/phone-acceptance.md`.
-2. Inspect `git status --short`, recent commits, and any working diff. Another agent may own a pending change; do not overwrite it.
-3. Read `docs/testing/known-limitations.md` and the relevant implementation/tests. An ignored scratch progress log may exist at `.superpowers/sdd/2026-10-03-focusgate/progress.md`; tracked documentation remains the durable handoff.
-4. Reconcile recent user corrections and observed phone failures with documentation. Continue the authorized task; do not request the same approval again merely because context was compacted.
+## Resume work
+
+1. Read [AGENTS.md](../AGENTS.md), the [accepted design](superpowers/specs/2026-10-03-focusgate-design.md), and [phone acceptance](testing/phone-acceptance.md).
+2. Read [the roadmap](roadmap.md) for current tasks and completion. Original plan checkboxes are historical.
+3. Inspect `git status --short`, recent commits and the working diff. Preserve other agents' pending changes.
+4. Read [known limitations](testing/known-limitations.md) and relevant code/tests. Scratch evidence may exist at `.superpowers/sdd/2026-10-03-focusgate/progress.md`. Tracked docs remain the durable handoff.
+5. Apply recent user corrections and verified phone evidence. Continue authorized work. Context compaction does not require the same approval again.
 
 ## Approved behavior
 
-Three simple tabs expose Blockers, Restricted Mode, and More. Editable presets block native/web YouTube and Instagram, and offer one shared 15-minute clock-hour budget for Chrome, Edge, Telegram, and Ozon shopping. Rules support schedules, days, date ranges, quotas, and optional maximum continuous sessions with required breaks. Default presets are not hardcoded enforcement.
+Support destinations live in `support/SupportConfig.kt`. The repository URL is public. Telegram feedback stays empty until the maintainer supplies a public link. The app displays and copies links only. It never opens an external app automatically. See [published-data review](testing/privacy-review.md) for the history-cleanup status. New commits use the public GitHub no-reply identity.
 
-Enabled rules work while configuration is unlocked. Restricted Mode locks changes, with password, timer and password OR timer release choices. AND is retained only to decode and honor existing legacy sessions. Provably restrictive additions may be allowed while locked. Release unlocks configuration; automatic temporary pause/relock is deferred. Website rules operate only on confidently recognized browser address bars, with host matching or bounded RE2/J full-match regex. Unknown URLs remain allowed. Denial currently returns Home rather than navigating to GitHub.
+The tabs are Blockers, Restricted Mode and More. Editable presets block native/web YouTube and Instagram. Chrome, Edge, Telegram and Ozon shopping share 15 minutes per clock hour. Rules support days, time windows, date ranges and quotas. Optional continuous-session caps require uninterrupted breaks. Presets are ordinary rules.
 
-Device Admin, Settings blocking, and Recents protection provide optional normal-action friction. The app cannot promise defense against disabling Accessibility, force-stop, data removal, safe mode, root/ADB, or factory reset. Usage Access is not required by current accounting. Donations contain empty maintainer-editable constants in `donations/DonationConfig.kt`; no payment/network integration exists.
+Enabled rules work when configuration is unlocked. Restricted Mode prevents weaker changes. New locks support Password only, Timer only and Password OR timer. Existing legacy AND sessions remain supported. New AND locks are refused. Provably restrictive additions can be permitted during a lock. Release unlocks configuration. It does not disable blockers. Temporary pause with automatic relock is deferred.
 
-## Architecture map
+Website rules use confidently recognized browser address bars. Matching uses hosts or bounded RE2/J full-match regex. Unknown URLs remain allowed. Denial returns Home. It does not navigate to GitHub.
 
-Source roots are `policy/src/main/kotlin/io/github/pesterevnikita/focusgate/policy/` and `app/src/main/java/io/github/pesterevnikita/focusgate/`.
+Device Admin, Settings and Recents controls add optional friction. They cannot guarantee protection against permission loss, force-stop, data removal, safe mode, root/ADB or factory reset. Accounting does not require Usage Access. Donation constants in `donations/DonationConfig.kt` remain empty. There is no payment or network integration.
+
+## Architecture
+
+Source roots:
+
+- `policy/src/main/kotlin/io/github/pesterevnikita/focusgate/policy/`
+- `app/src/main/java/io/github/pesterevnikita/focusgate/`
 
 | Area | Responsibility |
 | --- | --- |
-| `policy/PolicyEngine`, `ScheduleEvaluator`, `UrlMatcher` | Pure JVM applicability, deny precedence, schedule transitions, domain/regex matching |
-| `policy/UsageLedger`, `BucketClock` | Shared foreground accounting, bucket resets, continuous sessions and required breaks |
-| `policy/RestrictedSession` | Release truth tables, deadline clocks, restrictive mutation rules |
-| `data/AppStore`, `AppState`, `FocusGateDatabase` | Mutex plus Room transaction; one versioned JSON state row; durable revision checks and atomic policy/session/ledger updates |
-| `accessibility/FocusGateAccessibilityService`, `BrowserAdapter` | Android observation, confident URL extraction, Home redirection, service lifecycle |
-| `accessibility/EnforcementNotification` | Ongoing notification for foreground promotion of the existing Accessibility service; promotion and observed swipe-away behavior verified on Xiaomi |
-| `runtime/EnforcementController` | Connects observations, policy decisions, ledger checkpoints, and platform actions |
-| `runtime/ObservationDispatcher`, `TransitionScheduler` | Retains observations arriving during suspended IO; owns transition callback scheduling |
-| `runtime/AndroidClock`, `BootReceiver` | UTC/monotonic/boot identity and boot/unlock reconciliation |
-| `health/SetupPreflight`, `HealthWorker` | Capability checks and periodic WorkManager health checks; not a guarantee of recovery from OEM termination |
-| `health/SetupScreens` | Best-effort Android/OEM setup-screen routing; permission and Background autostart grants remain manual |
-| `security/PasswordVerifier` | Versioned salted PBKDF2-HMAC-SHA256 credentials; password arrays cleared after use |
-| `diagnostics/LocalDiagnostics` | Bounded local category/timestamp records; no screen text or raw URLs |
-| `ui/FocusGateApp`, `MainActivity` | Compose tabs, editors, setup, import/export, countdown and help |
+| `policy/PolicyEngine`, `ScheduleEvaluator`, `UrlMatcher` | JVM rule evaluation, denial precedence, transitions and host/regex matching |
+| `policy/UsageLedger`, `BucketClock` | Shared foreground accounting, bucket resets, session caps and breaks |
+| `policy/RestrictedSession` | Release conditions, deadline clocks and restrictive changes |
+| `data/AppStore`, `AppState`, `FocusGateDatabase` | Mutex and Room transaction; one versioned JSON row; atomic state changes and stale-write guards |
+| `accessibility/FocusGateAccessibilityService`, `BrowserAdapter` | Android observations, known URLs, Home actions and service lifecycle |
+| `accessibility/EnforcementNotification` | Ongoing notification for foreground priority of the existing service |
+| `runtime/EnforcementController` | Observations, decisions, checkpoints and platform actions |
+| `runtime/ObservationDispatcher`, `TransitionScheduler` | Retain events during suspended IO; schedule transition callbacks |
+| `runtime/AndroidClock`, `BootReceiver` | UTC, monotonic time, boot identity and boot/unlock recovery |
+| `health/SetupPreflight`, `HealthWorker` | Capability checks and periodic best-effort health checks |
+| `health/SetupScreens` | Best-effort setup links; the user grants permissions and Background autostart |
+| `security/PasswordVerifier` | Salted, versioned PBKDF2-HMAC-SHA256 verifier; clear password arrays after use |
+| `diagnostics/LocalDiagnostics` | Bounded category/timestamp records; no screen text or raw URLs |
+| `ui/FocusGateApp`, `MainActivity` | Tabs, editors, setup, import/export, countdown and help |
 
-State emission follows successful durable commits. Checkpoints during billable use occur every five seconds and at transitions; process death may lose uncommitted usage. Same-boot deadlines/breaks use monotonic time; cross-boot fallback uses UTC. Only a minimal locked flag is stored device-protected before unlock. Policy and credentials remain in credential-protected storage.
+Emit state only after a durable commit. Save billable usage every five seconds and at transitions. Process death can lose uncommitted usage. Use monotonic time for same-boot deadlines and breaks. Use UTC after reboot. Before first unlock, device-protected storage holds only a minimal locked flag. Full policy and credentials use credential-protected storage.
 
-Configuration export excludes credentials, active locks, usage counters, and logs. Import validates size, enums, references, rules and numeric bounds; locked imports are refused. Imports reset optional protections for capability review. Runtime manifest explicitly removes INTERNET and ACCESS_NETWORK_STATE, including dependency contributions, and excludes backups.
+Exports exclude credentials, active locks, usage and logs. Imports validate size, enums, references, rules and numeric bounds. Refuse imports while locked. Reset imported optional protections for capability review. The merged runtime manifest removes INTERNET and ACCESS_NETWORK_STATE, including dependency contributions. Backup is excluded.
 
-The current implementation uses Groovy Gradle scripts to avoid a corporate-laptop Kotlin DSL ZIP-opening stall. Product code remains Kotlin. State/preferences share one atomic Room document rather than separate DataStore storage. These are deliberate implementation choices, not instructions to migrate them during unrelated work.
+Gradle scripts use Groovy after an observed Kotlin DSL ZIP-opening stall. Product code uses Kotlin. State and preferences share one atomic Room document. Do not migrate these choices during unrelated work.
 
-## Windows build recipe
+## Windows build
 
-Use a local clone and Java 21. Configure the Android SDK in untracked local.properties.
+Run PowerShell from the repository root. Use JDK 21 and a local Android SDK. Keep `local.properties` and machine-specific notes untracked.
 
-Current toolchain: Gradle 8.13, AGP 8.11.2, Kotlin 2.0.21, compile/target SDK 36, min SDK 29. Wrapper distribution checksum is checked in. Gradle properties limit workers to two and use in-process nonincremental Kotlin compilation after a Windows temporary-directory failure.
-
-Known working command on this laptop:
+Toolchain: Gradle 8.13, AGP 8.11.2, Kotlin 2.0.21, compile/target SDK 36, min SDK 29. The wrapper checksum is tracked. Gradle limits workers to two. Kotlin compilation runs in-process without incremental compilation after a Windows temporary-directory failure.
 
 ```powershell
-$env:JAVA_HOME = '<JDK_21>'
-.\gradlew.bat :policy:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --console=plain 
+# Replace the placeholders with local installation directories.
+$env:JAVA_HOME = '<JDK_21_DIRECTORY>'
+$env:ANDROID_HOME = '<ANDROID_SDK_DIRECTORY>'
+.\gradlew.bat :policy:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --console=plain
 ```
 
-If a development proxy is required, configure it locally. Do not publish its address or credentials.
+Keep proxy hosts, ports and credentials in local untracked configuration. If needed, use `-Pandroid.aapt2FromMavenOverride=<ANDROID_SDK_DIRECTORY>/build-tools/<VERSION>/aapt2.exe`. Omit unnecessary overrides. Cache writes and dependency downloads may need sandbox escalation.
 
-The latest full verification passed 69 unit tests, lint with zero errors/five warnings, and assembled debug and unsigned release APKs. The separate instrumentation APK was built and exercised earlier. One Room instrumentation test also passed on the Xiaomi. Reports are in `policy/build/test-results/test/`, `app/build/test-results/testDebugUnitTest/`, and `app/build/reports/`.
+The latest full verification passed 69 unit tests. Lint reported zero errors and five warnings. Debug and unsigned release APKs built. The separate instrumentation APK built earlier. One Room test passed on the Xiaomi. Reports are under `policy/build/test-results/test/`, `app/build/test-results/testDebugUnitTest/` and `app/build/reports/`. Check acceptance records before treating this history as current evidence.
 
 ## Device workflow
 
-Target: Xiaomi 11T, Android 14/API 34, user-reported HyperOS 1.0.15.0. Add Android SDK platform-tools to PATH.
+Target: Xiaomi 11T, Android 14/API 34. The user reported HyperOS 1.0.15.0. Add the SDK `platform-tools` directory to PATH.
 
 ```powershell
 adb install -r --no-streaming app/build/outputs/apk/debug/app-debug.apk
@@ -72,40 +82,54 @@ adb shell pidof io.github.pesterevnikita.focusgate
 adb logcat -d -t 300 -s AndroidRuntime:E
 ```
 
-Do not uninstall/clear data during an upgrade test. Xiaomi may require Install via USB and a manual confirmation. Both main and separate test APKs now install successfully; earlier INSTALL_FAILED_USER_RESTRICTED failures were resolved. Accessibility was granted manually. Native YouTube/Instagram redirection is observed; the user also saw four seconds of Telegram usage charged to the shared quota.
+Do not uninstall or clear data during upgrade tests. Xiaomi can require Install via USB and manual confirmation. Main and test APK installations succeeded after earlier INSTALL_FAILED_USER_RESTRICTED failures. The user granted Accessibility manually. Native YouTube/Instagram redirection was observed. The user also reported four seconds of Telegram charged to the shared budget.
 
-The initial user report was a serious availability regression: swiping FocusGate out of Recents stopped enforcement, reopening did not restore it, and Accessibility reported a malfunction until manually toggled off/on. Android exit information now identifies a HyperOS `SwipeUpClean` process kill, with no observed AndroidRuntime crash. The earlier Other permissions setup had not enabled the separate true Background autostart setting. The user manually enabled its actual OEM checkbox. A later swipe still killed the old process, but Android automatically reconnected Accessibility in a new process and YouTube again returned Home without a manual regrant. This is measured recovery after the setup change, with a possible short enforcement gap; it does not prove every restart scenario.
+### Swipe-away history
 
-The verified lifecycle change promotes the existing Accessibility service to specialUse foreground priority while enabled blockers or Settings/Recents protections need enforcement. System dumps and an app-only screenshot confirmed foreground/connected status. Repeated actual card removals retained the same process and native blocking; the final repeat avoided UiAutomation. The onInterrupt feedback fix and independent-protection eligibility regressions passed. These observations do not prove every process-death, reboot or screen-off scenario.
+The user first reported that Recents removal stopped enforcement. Reopening did not repair Accessibility. A manual off/on toggle was needed. Android exit information showed HyperOS `SwipeUpClean`, with no observed AndroidRuntime crash.
 
-Room instrumentation tests use separate database names. To avoid a Gradle device runner uninstalling the main app and losing its grants, build `:app:assembleDebugAndroidTest`, manually install only `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk`, then invoke:
+Other permissions had not enabled the separate Background autostart setting. The user enabled that checkbox manually. A later swipe killed the old process, but Android reconnected Accessibility in a new process. YouTube returned Home without a manual regrant. A short enforcement gap remained possible.
+
+The existing Accessibility service now uses `specialUse` foreground priority when blockers or Settings/Recents protections need enforcement. Dumps and an app-only screenshot confirmed foreground/connected status. Repeated card removals retained the process and native blocking. The final repeat avoided UiAutomation. The `onInterrupt` fix and independent-protection eligibility regressions passed. These results do not prove all screen-off, process-death or reboot cases.
+
+### Instrumentation precautions
+
+Room fixtures use separate database names. They still share the boot-session preference mirror. Run them with Restricted Mode off. Understand state changes before running each fixture.
+
+A Gradle device runner can uninstall the main app and lose its grants. Instead, build `:app:assembleDebugAndroidTest`. Install only `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk`. Then run:
 
 ```powershell
 adb shell am instrument -w io.github.pesterevnikita.focusgate.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
-Run the Room fixture with Restricted Mode off: its separate database still shares the boot-session preference mirror. Keep tests narrowly scoped and understand their state changes before running. Instrumentation force-stops the target process; on this phone it left Accessibility malfunctioning until a manual off/on toggle. Do not use stock adb shell uiautomator dump for service-resilience assertions: it suppresses Accessibility by default. Prefer input/dumpsys and app-only screenshots, or UiAutomation configured with FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES. Coordinate UI taps with the user and verify the foreground screen; shared device interaction can invalidate old coordinates. Broader browser coverage, interrupted breaks, process/reboot recovery, Settings/Recents classification, Device Admin, password timing and battery cost still require measured phone acceptance. Shared exhaustion, cap across an hour boundary, break UI recovery and short TIMER locks are now measured; read the latest table. Read the acceptance table for the latest results.
+Instrumentation force-stops the target. On this phone, Accessibility then needed a manual off/on toggle. Verify recovery afterward. Stock `adb shell uiautomator dump` suppresses Accessibility. Do not use it to prove service resilience. Use input/dumpsys, app-only screenshots or UiAutomation with `FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES`.
 
-## History and maintenance
+Coordinate taps with the user. Verify the current screen before input. Shared use can invalidate coordinates. Read [phone acceptance](testing/phone-acceptance.md) for measured shared exhaustion, hour-boundary caps, break recovery and short Timer locks. Browser coverage, interrupted breaks, recovery, protections, password timing and battery cost still need broader checks.
 
-GitHub publishing is authorized. The user repaired normal authentication and pushed the branches; a subsequent noninteractive remote check succeeded. Push normal local commits through credential-manager authentication; never reuse the token pasted into the initial conversation.
+## Maintenance and current evidence
 
-When changing behavior, update the relevant design/development/testing notes. Add comments explaining lifecycle ownership, clock assumptions, mutation guards and durable state boundaries. Finish with a concise account of changed behavior, actual verification, and remaining measured limitations. Avoid claiming all restart scenarios work based only on persisted data or JVM tests.
+[The roadmap](roadmap.md) tracks current work. [Phone acceptance](testing/phone-acceptance.md) records results. [Known limitations](testing/known-limitations.md) records gaps. Use these records to select work. Do not turn the history below into completion claims.
 
-## Current extension
+GitHub publishing is authorized. Normal authentication was repaired, and a noninteractive remote check succeeded. Use credential-manager authentication. Never reuse the exposed token from the earlier conversation.
 
-The user approved retaining shell-only ADB maintenance controls in final builds. Read [the API and helper guide](adb-control.md) and [extension plan](superpowers/plans/2026-10-03-adb-maintenance.md). The main-source provider requires caller DUMP permission and UID 2000; every policy write still uses transactional AppStore guards. It provides no password/release/grant/reset endpoint. Do not remove it merely because a build is release.
+Update relevant design, development and testing docs after behavior changes. Explain lifecycle ownership, clocks, mutation guards and durable state in comments. Report changed behavior, actual checks and remaining limits. Persisted state or JVM tests alone do not prove Android recovery.
 
-Current phone configuration restored after cap acceptance: shared quota 15 minutes per clock hour, continuous cap off, break five minutes; both editable presets enabled. Restricted Mode off. Next checks: password-policy release, reboot/screen-off recovery, optional admin and Settings/Recents protections. ADB profile import uses the same importer and must refuse active locks.
+### ADB maintenance
 
-Password lifecycle follow-up: the user reported blind replacement and unclear saved status. Initial setup must confirm the new password; replacement must verify current password plus matching new/repeated values while unlocked, with failed attempts persisted. Save only the verifier. Remember the last successfully selected lock mode/duration/additions locally and start fresh deadlines on each lock; maintenance test timers must not overwrite those choices. Existing credentials remain intact on upgrade.
+The user approved shell-only maintenance controls in final builds. Read [the ADB guide](adb-control.md) and [extension plan](superpowers/plans/2026-10-03-adb-maintenance.md). The provider requires caller DUMP permission and UID 2000. All writes use transactional AppStore guards. It exposes no password, release, grant or reset endpoint. Release builds retain it. Profile import uses the same importer and refuses active locks.
 
-UI follow-up: Restricted Mode separates status/password/session/device protections into cards. More uses setup, display, backups, help, developer tools, and about/support sections; secondary help is collapsed. The blocker editor uses explicit Always block during schedule / Allow limited usage radio choices. Protection edits pass their original settings snapshot to the transaction to reject stale concurrent updates.
+After cap tests, the phone configuration was restored: 15 minutes per clock hour, continuous cap off, five-minute break, both editable presets enabled, Restricted Mode off. Do not assume live state is unchanged. Next checks are in the roadmap.
 
-The user reports the password/UI follow-up works as intended. Treat this as general user confirmation, not a measured release-policy matrix. Continue short OR release/relock and remaining device acceptance separately.
+### Password and UI follow-up
 
-Password removal/visibility follow-up: `PasswordChanges.remove` verifies the latest stored credential and persists the same failed-attempt delay as change/unlock. `AppStore.removePassword` performs it transactionally, refuses active sessions, clears caller buffers, and leaves policy/usage/preferences intact. No ADB credential endpoint was added. `ui/PasswordInput` supplies independent, initially masked eye controls for setup, change, removal and unlock. Transient input/visibility is not saved across dialog recreation.
+Initial password setup requires matching new/repeated inputs. Change requires the current password and matching new/repeated inputs while unlocked. Persist failed-attempt delays. Store only the verifier. Keep credentials across upgrades. Remember the last successful lock mode, duration and additions. Each lock starts a fresh deadline. Maintenance test timers must not replace remembered choices.
 
-The removal dialog explains that Password-only and OR starts need a saved password, while Timer-only remains available by explicit selection and has no early password override. Removing a password never silently converts a remembered OR choice to Timer. A new password can be set afterwards without old-password input. Remembered mode/duration/additions remain intact until a different successful lock updates them. Four new lifecycle regressions cover removal, fresh setup, lock-start prerequisites, incorrect/stale attempts and cooldown, locked refusal, and input clearing. See the current acceptance record for verification and installation results.
+Restricted Mode uses status, password, session and protection cards. More groups setup, display, backups, help, developer tools and about/support. Secondary help is collapsed. The blocker editor offers Always block during schedule or Allow limited usage. Protection writes include the original snapshot to reject stale changes.
 
-This update passed 69 tests, lint (zero errors/five existing warnings), and both APK builds; read-only review found no issues. Debug update installed successfully, Accessibility/foreground reconnected, and presets/usage stayed unchanged. On-phone checks verified the removal explanation and initially hidden/revealed/reopened-hidden eye behavior using disposable text, then cancelled. The user's existing password was not removed or read. The user was invited to privately test removal and fresh setup; screen control is finished while that check is pending.
+`PasswordChanges.remove` checks the latest credential and uses the shared retry delay. `AppStore.removePassword` runs the change transactionally. It refuses active sessions, clears caller buffers and preserves policy, usage and preferences. No ADB credential endpoint exists.
+
+`ui/PasswordInput` has independent eye controls for setup, change, removal and unlock. Inputs start masked. Dialog recreation does not save input or visibility. Password-only and OR starts require a saved password. Timer-only requires explicit selection and has no early password override. Removal never converts remembered OR to Timer. After removal, setup needs no old password. Remembered choices change only after another successful lock.
+
+Four added regression tests cover removal, fresh setup, lock prerequisites, incorrect/stale attempts, cooldown, locked refusal and input clearing. The update passed 69 tests, lint and both APK builds. Read-only review found no issues. Debug installation preserved presets/usage and reconnected Accessibility. Disposable input confirmed the removal explanation and hidden/revealed/reopened-hidden behavior. The agent cancelled the dialog and did not read or remove the real password.
+
+The user reported that password controls and the revised UI work. This is general user confirmation. It is not a measured release-policy matrix. Password removal remains unavailable during Restricted Mode. Unlock normally, then remove with the current password. The user withdrew the proposed unlock-and-remove shortcut. Its exploratory test edits were reverted. Product code and the installed baseline retain `a012599` behavior. No further password redesign is pending.

@@ -1,19 +1,31 @@
 # Development build limitations
 
-- Main debug installation and native YouTube/Instagram blocking are verified on the Xiaomi 11T. Device acceptance remains partial; consult the acceptance table rather than assuming all restart, browser and lock cases work. It is a development build, not a certified first release.
-- Settings and Recents classification is deliberately conservative and class-based. HyperOS may expose generic screen classes. Sensitive-only protection allows unknown screens; whole-Settings protection is broader and can obstruct repair until password/timer release. Network exceptions require a recognized screen.
-- Chrome/Edge adapters require a visible recognized address bar in a stable matching window. Unknown URLs, hidden address bars, unsupported browsers and embedded WebViews are allowed by website rules. Independent browser app quotas still apply. There is no cached URL fallback or traffic inspection.
-- Screen-off pauses billing; background playback continues. Multi-window/PiP and notification-shade observation have not been device-characterized.
-- Checkpoints are scheduled every five seconds during billable use and at transitions. Ordinary death can lose up to one uncommitted checkpoint interval; OS suspension can introduce larger availability gaps. Clock changes across reboot cannot be resolved using a trusted external clock because the app is offline.
-- Locked state persists locally, but force-stop, disabling Accessibility, data removal, safe mode, uninstallation, or OEM suspension can stop enforcement. Device Admin adds only normal deactivation friction; no device-owner privilege is used.
-- HyperOS initially killed the process with `SwipeUpClean`, leaving Accessibility malfunctioning until toggled off/on. Enabling the actual Background autostart switch allowed automatic reconnection; it is separate from Other permissions / Start in background. A brief reconnect gap was observed. Battery saver should also be set to No restrictions. Foreground priority on the existing service improves process importance but is not an OS-level survival guarantee.
-- Remaining time is shown in blocker cards and an optional notification. A floating Accessibility countdown overlay is not implemented in this development build. Usage Access is not requested because current accounting does not need it.
-- Donation placeholders support static network/address display and copy after maintainer configuration. A QR renderer is deferred while the address is blank. No payments or network activity are implemented.
-- Presentation preferences are stored in the same atomic Room state document, rather than separate DataStore storage. Mutation guards keep them separate from enforcement policy.
-- Policy uses string IDs and typed data classes rather than dedicated Kotlin value-ID wrappers. Gradle scripts use Groovy to avoid an observed Kotlin-DSL compilation stall on this laptop; product code remains Kotlin.
-- Password derivation has a conservative default work factor but requires device benchmarking before release. No plaintext password, cloud recovery, or “forgot password” bypass exists.
-- Initial setup uses new/repeat fields and saved-password status; changing a saved password requires current/new/repeat while unlocked and throttles incorrect current-password attempts. The user reports the password/UI update works; a full scripted phone release-policy matrix is still pending. Authenticated removal and input eye controls are implemented and unit/build checked; removal explanation and eye behavior were checked on-phone with disposable text. Actual removal and fresh setup await private user confirmation. Removal requires the current password while unlocked, preserves rules/counters, and prevents new Password-only/OR locks until a new password is set. Timer-only remains available by explicit choice. There is no forgotten-password reset. Release/expiry retains the saved password.
-- New session choices are Password only, Timer only, and Password OR timer. Password AND timer remains supported only for existing persisted legacy locks, with both conditions required at release time and no early-password preauthorization. Each start uses a fresh duration. Last successfully started mode/duration/restrictive-additions preferences are local; short maintenance timer sessions must not overwrite them. Device verification of these changes remains pending.
-- Release mode unlocks configuration; there is no automatic temporary-pause/relock feature. Disable/re-enable ordinary blockers and start another locked session as needed.
-- Advanced diagnostics record only bounded typed categories and timestamps. They do not record URLs, page content, messages, secrets or screenshots.
-- GitHub credential-manager authentication was repaired by the user and verified. Never use the exposed token from the original conversation.
+**TL;DR:** Phone acceptance is partial. Native blockers and repeated swipe-away enforcement were observed on Xiaomi 11T. Browser edge cases, restart recovery, Device Admin, Settings/Recents and full password release tests remain open. See the [roadmap](../roadmap.md) and [phone evidence](phone-acceptance.md). This is a development build, not a finished release.
+
+## Enforcement and recovery
+
+- Settings/Recents recognition uses conservative screen classes. HyperOS may return generic classes. Sensitive protection allows unknown screens. All-Settings protection can obstruct repair until normal password/timer release. Network exceptions need a recognized screen.
+- Chrome/Edge need a visible recognized address bar in a stable matching window. Unknown URLs, hidden bars, unsupported browsers and embedded WebViews are allowed by website rules. Separate browser app quotas still apply. No cached URL fallback or traffic inspection is used.
+- Screen-off pauses billing. Background playback continues. Multi-window, picture-in-picture and notification-shade behavior have not been tested fully on the device.
+- Usage checkpoints run every five seconds while billing and at transitions. Process death may lose one uncommitted interval. OS suspension can cause larger enforcement gaps. An offline app has no trusted external clock to resolve cross-reboot clock changes.
+- Lock state persists locally. Force-stop, Accessibility removal, cleared data, safe mode, uninstall and OS suspension can stop enforcement. Ordinary Device Admin adds deactivation friction; no device-owner privilege is used.
+- HyperOS initially killed FocusGate with `SwipeUpClean`; Accessibility stayed malfunctioning until manually toggled. Enabling true Background autostart allowed reconnection with a brief observed gap. This switch is separate from Other permissions / Start in background. Set Battery saver to No restrictions too. Foreground priority improves process importance; it does not guarantee survival.
+
+## Passwords and release
+
+- Password derivation needs device benchmarking before release. No plaintext password, cloud recovery or forgotten-password reset is provided.
+- Setup uses new/repeat input and saved-password status. Change requires current/new/repeat while unlocked. Wrong current-password attempts share a persisted retry delay with removal and unlock.
+- Authenticated removal and eye controls passed unit/build checks. Removal explanation and eye state were checked on-phone using disposable text. The user reports password/UI behavior is fine, including the removal/eye follow-up. This is general user confirmation, not an instrumented private-entry sequence or full release-policy matrix.
+- Removal requires the current password while unlocked and preserves rules, usage and remembered choices. The user confirmed it must remain unavailable during Restricted Mode. Without a verifier, Password-only/OR cannot start. Timer-only remains available by explicit choice. Release/expiry keeps the saved password.
+- New choices are Password only, Timer only and Password OR timer. Existing legacy AND locks need both conditions at release. An early password does not authorize later release. New AND sessions are rejected.
+- Each Start creates fresh deadlines. Last successful mode/duration/additions choices stay local. Short maintenance timers do not overwrite them. The full phone release/relock matrix is pending.
+- Release unlocks settings. Automatic temporary pause/relock is not implemented. Disable/re-enable ordinary blockers and start another session as needed.
+
+## UI, storage and support
+
+- Remaining time appears in blocker cards and an optional notification. A floating Accessibility countdown is not implemented. Usage Access is not requested because current billing does not need it.
+- Donation placeholders show network/address and copy controls only after maintainer setup. QR rendering is deferred while the address is blank. No payment or runtime network integration is used.
+- Display preferences share the atomic Room state document instead of separate DataStore storage. Mutation guards keep display changes separate from enforcement rules.
+- Policy uses string IDs and typed data classes, without dedicated value-ID wrappers. Gradle scripts use Groovy after an observed Kotlin-DSL compilation stall. Product code remains Kotlin.
+- Diagnostics store bounded categories and timestamps only. No URLs, page content, messages, secrets or screenshots are logged.
+- Normal GitHub credential-manager authentication was repaired and verified. Never use the exposed token from the original conversation.
