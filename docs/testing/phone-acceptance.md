@@ -116,3 +116,7 @@ The support-link update passed 69 unit tests with no failures/errors/skips. Lint
 An app-only screenshot verified the public repository URL, Copy repository link button, and Telegram feedback placeholder. Tapping the button showed Repository link copied. The agent did not read the prior clipboard. The Telegram placeholder stays empty until the maintainer supplies a public link. FocusGate does not open an external app or send a network request.
 
 These observations add evidence for R3 and support UI. They do not complete the full quota/schedule matrix or all lifecycle checks.
+
+The interrupted-break check used a temporary 120,000 ms continuous cap and 60,000 ms required break. After the first Chrome visit, effective time remaining was 86,264 ms. Returning before a full break left 85,709 ms, not a fresh 120,000 ms. After a second visit, 56,423 ms remained. A partial absence retained that value. A full uninterrupted break restored 120,000 ms.
+
+The original profile was then restored: both presets enabled, 900,000 ms/hour allowance, cap off and 300,000 ms break. Accessibility stayed connected/foreground and Restricted Mode stayed off. This test crossed 13:00; the final hourly remaining value was 900,000 ms in the new hour. The test did not measure the exact hourly reset moment.

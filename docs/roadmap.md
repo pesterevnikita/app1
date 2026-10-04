@@ -39,7 +39,7 @@ Checked items show implemented features. The evidence below limits those claims.
 | --- | --- |
 | Native YouTube/Instagram | Home redirection observed; editable disabling/reenabling observed |
 | Shared allowance | Short combined Chrome/Edge allowance exhausted and redirected Home |
-| Continuous session | Cap enforced across an hour boundary; full-break recovery and countdown observed |
+| Continuous session | Cap enforced across an hour boundary; full-break recovery and countdown observed. A later partial break retained usage; a full uninterrupted break reset it |
 | Websites | Initial Chrome YouTube and Edge Instagram cases passed; broader coverage pending |
 | Swipe away from Recents | Repeated actual card removals retained connected foreground enforcement after Xiaomi setup |
 | Persistence/update | Room reopen/stale-write test passed; debug app updates preserved configuration and reconnected Accessibility |
