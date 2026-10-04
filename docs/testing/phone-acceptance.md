@@ -58,8 +58,8 @@ Do not use stock `uiautomator dump` for enforcement checks. It suppresses Access
 | Device Admin / launcher uninstall friction | NOT RUN | Optional empty-policy admin declaration needs device confirmation |
 | Sensitive/whole Settings, network exceptions, Recents | NOT RUN | Experimental class-based adapters; test actual HyperOS routes |
 | Swipe-away and foreground promotion | PASS for observed scenario | Repeated FocusGate Recents-card removal kept PID, foreground service and connected Accessibility. YouTube returned Home. Final repeat used input/dumpsys without UiAutomation |
-| Screen off/on, process/service death, launcher restart | PARTIAL | One-minute TIMER lock and connected foreground service survived 15-second screen off/on. Manual unlock then needed; post-unlock blocking and other restart cases remain open |
-| Reboot and app-update recovery | PARTIAL | Debug update preserved rules and reconnected/promoted Accessibility. Reboot and active-lock upgrade remain unverified |
+| Screen off/on, process/service death, launcher restart | PASS for short tested cases | Later recovery checks below cover manual unlock, screen-off billing, process death while idle/billing, service reconnection and launcher restart. Long idle remains open |
+| Reboot and app-update recovery | PASS for tested cases | Active TIMER deadline and counters survived reboot and same-debug-APK replacement. Automatic post-unlock reconnection observed. Different-version/schema upgrade is not covered |
 | Emergency UI, calls, split-screen/PiP | NOT RUN | Exclusions exist; phone behavior not measured |
 | Password derivation timing and CPU/battery | NOT RUN | Default 210,000 iterations not phone-benchmarked |
 
@@ -120,3 +120,36 @@ These observations add evidence for R3 and support UI. They do not complete the 
 The interrupted-break check used a temporary 120,000 ms continuous cap and 60,000 ms required break. After the first Chrome visit, effective time remaining was 86,264 ms. Returning before a full break left 85,709 ms, not a fresh 120,000 ms. After a second visit, 56,423 ms remained. A partial absence retained that value. A full uninterrupted break restored 120,000 ms.
 
 The original profile was then restored: both presets enabled, 900,000 ms/hour allowance, cap off and 300,000 ms break. Accessibility stayed connected/foreground and Restricted Mode stayed off. This test crossed 13:00; the final hourly remaining value was 900,000 ms in the new hour. The test did not measure the exact hourly reset moment.
+
+## 2026-10-04: recovery checks
+
+The user selected lifecycle acceptance before the password release matrix. Initial state: Restricted Mode off, both presets enabled, 900,000 ms/hour allowance, cap off, and 300,000 ms break. No permissions were changed through ADB; the user later toggled Accessibility manually. No password was changed and no app data was cleared.
+
+Recovery was checked before opening FocusGate or calling its maintenance provider. A provider call can start the process and reconcile timer expiry, so it is not proof of automatic recovery. System service/PID observations and native YouTube Home redirection came first. No instrumentation or UiAutomation was used.
+
+| Case | Measured result |
+| --- | --- |
+| Screen off/on and manual unlock | Foreground service and the same process survived 20 seconds off. After the user unlocked, YouTube returned Home. Restricted Mode was off for this case |
+| Abrupt process death, unlocked configuration | `run-as ... kill -9 <recorded PID>` terminated the debug process without package force-stop. No PID at the first 117 ms check; a new PID at 2,213 ms. Foreground service returned and YouTube returned Home before a provider call |
+| Quota retention after idle process death | A safe Chrome `about:blank` visit consumed normal allowance. Remaining usage was 882,110 ms before and after death, with revision 17 and both rules enabled |
+| Launcher restart during a five-minute TIMER lock | Force-stopped only `com.miui.home`, then sent Home. Launcher PID changed. FocusGate retained its process/foreground service; YouTube returned Home. Saved deadline and quota were unchanged |
+| Abrupt process death during the same lock | No FocusGate PID at 2,232 ms; new PID at 4,313 ms. Service returned automatically, YouTube returned Home, lock stayed active, and deadline/quota were unchanged |
+| APK replacement during the same lock | Reinstalled the existing debug APK with `adb install -r --no-streaming`, without clearing data. Service reconnected in a new process and YouTube returned Home before any app launch/provider query. Lock deadline, revision, rules and 882,110 ms remaining were retained |
+| Reboot during the same lock | After manual first unlock, system dumps showed a new connected foreground service before any provider call or FocusGate launch. The active TIMER lock retained its deadline, revision, rules and 882,110 ms remaining. YouTube and Instagram subsequently returned Home |
+| Explicit Accessibility off/on | User toggled the grant manually. Android showed no bound service during the off interval, then a new service record in the same process. Foreground promotion and YouTube Home redirection resumed before a provider query. This check happened after the first TIMER lock expired |
+| Screen-off billing during a new three-minute TIMER lock | Chrome `about:blank` was foreground before sleep. Remaining allowance was 870,200 ms after the screen-off transition and exactly 870,200 ms twenty seconds later. After manual unlock, YouTube returned Home and the lock retained its deadline. Normal Chrome billing resumed after unlock before the test navigation |
+| Process death while a quota app was active | Killed the debug process while Chrome `about:blank` was foreground. No PID at 85 ms; new process at 2,186 ms, with foreground service restored before a provider query. Remaining allowance went from the pre-kill checkpoint value of 836,269 ms to 824,152 ms after recovery and further browser use. Billing continued without replenishing usage; the active lock deadline was retained. Exact uncommitted usage loss was not measured |
+
+The short lock retained the original deadline of 13:24:34.518 in the phone timezone. Neither process restart nor replacement started a new five-minute period. This was replacement with the same debug APK, not a version/schema migration. PID observations give polling bounds for process recovery; they do not measure exact enforcement downtime. The first two process kills occurred while Home was active, after a usage checkpoint. They do not measure loss of an uncommitted billable interval.
+
+Reboot started at 13:20:38 with the short lock active. At 13:22:40 the phone was unlocked and Android showed a new foreground service. At 13:22:59 the original lock was still active, before its 13:24:34.518 deadline. ADB was unavailable during part of startup. No enforcement before first unlock was claimed or tested.
+
+The first YouTube launch after reboot was still resumed at the initial two-second check, then returned Home. A later timed launch showed YouTube resumed at 4,361 ms from command start and Home at 5,813 ms. Instagram showed its activity at 2,879 ms and Home at 4,311 ms. These intervals include launch and shell/dump overhead; they are not visibility-to-redirection latency measurements. The user considered a startup delay acceptable. No manual service repair or FocusGate launch was needed. Exact startup enforcement delay and long idle behavior remain unmeasured.
+
+After the first deadline passed, a status query reported configuration unlocked, with both blockers enabled and the quota unchanged. This confirms expiry reconciliation, not an autonomous background release instant. A new three-minute maintenance TIMER session used a fresh deadline of 13:29:14.669 and retained remembered user choices by design.
+
+The exported configuration matched the saved baseline exactly after these checks. Both presets still use the original 15-minute hourly allowance, cap off and five-minute break. Test browser use consumed ordinary allowance; no counter reset was requested. Passwords and grants were not read or changed through ADB.
+
+Longer screen-off/idle recovery belongs to the performance/overnight checks. Different-version upgrades, exact enforcement gaps and exact uncommitted usage loss remain unmeasured. These short phone cases are not a guarantee against OS suspension, force-stop or permission removal.
+
+Final handoff at 13:29:40: the second short lock had expired; Restricted Mode was off. Accessibility was connected/foreground, revision remained 17, both presets were enabled, and the baseline profile matched exactly. Shared remaining allowance was 824,152 ms after normal test use. FocusGate was brought to the foreground only after recovery verification finished. No source code changed for this session; the existing installed APK was used.

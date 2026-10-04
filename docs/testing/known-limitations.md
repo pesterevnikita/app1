@@ -1,6 +1,6 @@
 # Development build limitations
 
-**TL;DR:** Phone acceptance is partial. Native blockers and repeated swipe-away enforcement were observed on Xiaomi 11T. Browser edge cases, restart recovery, Device Admin, Settings/Recents and full password release tests remain open. See the [roadmap](../roadmap.md) and [phone evidence](phone-acceptance.md). This is a development build, not a finished release.
+**TL;DR:** Phone acceptance is partial. Native blockers, repeated swipe-away and short restart/reboot recovery passed on Xiaomi 11T. Long idle, browser edge cases, Device Admin, Settings/Recents and full password release tests remain open. See the [roadmap](../roadmap.md) and [phone evidence](phone-acceptance.md). This is a development build, not a finished release.
 
 ## Enforcement and recovery
 
@@ -8,6 +8,7 @@
 - Chrome/Edge need a visible recognized address bar in a stable matching window. Unknown URLs, hidden bars, unsupported browsers and embedded WebViews are allowed by website rules. Separate browser app quotas still apply. No cached URL fallback or traffic inspection is used.
 - Screen-off pauses billing. Background playback continues. Multi-window, picture-in-picture and notification-shade behavior have not been tested fully on the device.
 - Usage checkpoints run every five seconds while billing and at transitions. Process death may lose one uncommitted interval. OS suspension can cause larger enforcement gaps. An offline app has no trusted external clock to resolve cross-reboot clock changes.
+- Short recovery checks passed for screen off/on with manual unlock, process death while idle/billing, service reconnection, launcher restart, reboot and same-debug-APK replacement. Active TIMER deadlines and counters were retained. Early post-reboot app launches took several seconds to return Home, including launch/shell overhead. Exact enforcement latency, overnight availability and different-version/schema upgrades remain unmeasured. Recovery was inspected before app/provider startup could mask it.
 - Lock state persists locally. Force-stop, Accessibility removal, cleared data, safe mode, uninstall and OS suspension can stop enforcement. Ordinary Device Admin adds deactivation friction; no device-owner privilege is used.
 - HyperOS initially killed FocusGate with `SwipeUpClean`; Accessibility stayed malfunctioning until manually toggled. Enabling true Background autostart allowed reconnection with a brief observed gap. This switch is separate from Other permissions / Start in background. Set Battery saver to No restrictions too. Foreground priority improves process importance; it does not guarantee survival.
 

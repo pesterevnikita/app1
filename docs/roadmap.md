@@ -1,6 +1,6 @@
 # FocusGate roadmap
 
-**TL;DR:** Core features are implemented. First-release phone acceptance is incomplete. Start with R1 through R3. Keep password removal unavailable during Restricted Mode. Check off work only when evidence meets its exit conditions.
+**TL;DR:** Core features are implemented. Short lifecycle acceptance (R2) passed; first-release phone acceptance is incomplete. R1 and the remaining R3 cases are next. Keep password removal unavailable during Restricted Mode. Check off work only when evidence meets its exit conditions.
 
 Last reconciled: 2026-10-04. This file is the current work tracker. Original plans record earlier intentions. Their checkboxes do not show current completion.
 
@@ -42,7 +42,7 @@ Checked items show implemented features. The evidence below limits those claims.
 | Continuous session | Cap enforced across an hour boundary; full-break recovery and countdown observed. A later partial break retained usage; a full uninterrupted break reset it |
 | Websites | Initial Chrome YouTube and Edge Instagram cases passed; broader coverage pending |
 | Swipe away from Recents | Repeated actual card removals retained connected foreground enforcement after Xiaomi setup |
-| Persistence/update | Room reopen/stale-write test passed; debug app updates preserved configuration and reconnected Accessibility |
+| Persistence/update | Room reopen/stale-write test passed; active TIMER deadline/counters survived process death, launcher restart, reboot and same-debug-APK replacement. Post-unlock enforcement and service reconnection observed |
 | Timer lock | Short lock refused weakening/import/replacement; expiry unlocked configuration while blockers stayed enabled |
 | Profile import | Replacement round trip preserved remaining usage; locked import refused |
 | Password/UI | User reports controls work; eye masking/reveal/reopen checked with disposable input; individual private steps were not instrumented |
@@ -54,7 +54,7 @@ Checked items show implemented features. The evidence below limits those claims.
 ### 1. Finish core lock and recovery acceptance
 
 - [ ] **R1 - Release/relock matrix:** Record Password-only release, early OR password release and OR expiry. Check a fresh deadline and retained password after relock. Check wrong-password retry and locked password-removal refusal. Use short sessions. The user enters private passwords.
-- [ ] **R2 - Lifecycle:** Check screen off/on, unlock, service/process restart, launcher restart, reboot and app update during a short lock. Check enforcement, deadlines, counters, reconnection and gaps. A 15-second screen-off check and unlocked updates passed. They do not cover this matrix. Coordinate reboot with the user.
+- [x] **R2 - Short lifecycle acceptance:** Screen off/on and manual unlock, screen-off billing, idle/active-billing process death, service recovery, launcher restart, reboot and same-debug-APK replacement passed. Short TIMER locks retained deadlines/counters, and blockers resumed without app relaunch or a post-reboot grant repair. Explicit grant off/on also reconnected, outside a lock. Recovery timing is bounded by polling; exact enforcement gaps and different-version upgrades remain unmeasured. Long idle/overnight acceptance remains in R12. See [phone evidence](testing/phone-acceptance.md#2026-10-04-recovery-checks).
 - [ ] **R3 - Quota/schedule device cases:** Check interrupted breaks, app switching, daily reset and schedule start/end while an app stays open. Check overlapping blockers and counters after restart. Restore the 15-minute preset after temporary tests.
 
 ### 2. Verify optional device protections and browser coverage
