@@ -80,6 +80,8 @@ Checked items show implemented features. The evidence below limits those claims.
 
 ## Later work and excluded scope
 
+The [AppBlock and alternatives research](research/2026-10-04-appblock-market-research.md) compares documented mechanisms, privacy and candidate features. It adds ideas and test cases, not approved implementation commitments. Use it when refining R3/R7/R8/R9/R12 or selecting later work.
+
 - Rolling-hour budgets; current clock-hour behavior is intentional, with an optional continuous-session cap.
 - Temporary password-authorized pause with automatic relock/re-enabling.
 - More browser adapters, based on real device/version evidence.
