@@ -6,7 +6,7 @@ Last reconciled: 2026-10-04. This file is the current work tracker. Original pla
 
 ## Current position
 
-2026-10-04 follow-up: support UI now shows the public GitHub URL and copy action. Telegram feedback has an empty maintainer placeholder. All project docs use short technical English and a user TL;DR. AGENTS.md contains stable rules; current work belongs here. See [published-data review](testing/privacy-review.md) for the completed audit and pending history publication.
+2026-10-04 follow-up: support UI shows the public GitHub URL and copy action. Telegram feedback has an empty maintainer placeholder. All project docs use short technical English and a user TL;DR. AGENTS.md contains stable rules; current work belongs here. The user-approved privacy cleanup is published on both branches. See [published-data review](testing/privacy-review.md) for scope and verification.
 
 The core app is installed on Xiaomi 11T, Android 14, HyperOS 1.0.15.0. It supports development and personal testing. First-release acceptance is incomplete. The 2026-10-04 installed build includes password controls and support links. Check Git history for the latest source commit.
 
